@@ -564,21 +564,6 @@ test "sqDiff" {
         .{ .x = 0xffffffff, .y = 0xfffffffe, .diff = 0x0 },
         .{ .x = 0xffffffff, .y = 0xffffffff, .diff = 0x0 },
     };
-    const cases = [_]u32{
-        0,
-        1,
-        2,
-        0x0fffd,
-        0x0fffe,
-        0x0ffff,
-        0x10000,
-        0x10001,
-        0x10002,
-        0xfffffffd,
-        0xfffffffe,
-        0xffffffff,
-    };
-
     for (kases) |v| {
         const got = sqDiff(v.x, v.y);
         testing.expectEqual(v.diff, got);
