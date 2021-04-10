@@ -11,7 +11,6 @@ pub const Color = union(enum) {
     alpha16: Alpha16,
     gray: Gray,
     gray16: Gray16,
-    color: Color,
 
     pub fn toValue(self: Color) Value {
         return switch (self) {
@@ -23,7 +22,7 @@ pub const Color = union(enum) {
             .alpha16 => |v| v.toValue(),
             .gray => |v| v.toValue(),
             .gray16 => |v| v.toValue(),
-            .color => |v| v.toValue(),
+            else => unreachable,
         };
     }
 };
@@ -387,6 +386,7 @@ pub const RGBAModel = Model{ .convert = Model.rgbaModel };
 pub const RGBA64Model = Model{ .convert = Model.rgba64Model };
 pub const NRGBAModel = Model{ .convert = Model.nrgbaModel };
 pub const NRGBA64Model = Model{ .convert = Model.nrgba64Model };
+pub const AlphaModel = Model{ .convert = Model.alphaModel };
 pub const Alpha16Model = Model{ .convert = Model.alpha16Model };
 pub const GrayModel = Model{ .convert = Model.grayModel };
 pub const Gray16Model = Model{ .convert = Model.gray16Model };
