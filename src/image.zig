@@ -1,10 +1,14 @@
 const geom = @import("geom.zig");
 const color = @import("color.zig");
 
+const Rectangle = geom.Rectangle;
+const Point = geom.Point;
+const Color = color.Color;
+
 pub const Config = struct {
     model: color.Model,
-    width: int,
-    height: int,
+    width: isize,
+    height: isize,
 };
 
 pub const Image = union(enum) {
@@ -32,7 +36,85 @@ pub const Image = union(enum) {
     }
 };
 
-pub const RGBA = struct {};
+// RGBA is an in-memory image whose At method returns color.RGBA values.
+pub const RGBA = struct {
+    // pix holds the image's pixels, in R, G, B, A order. The pixel at
+    // (x, y) starts at pix[(y-Rect.Min.Y)*Stride + (x-Rect.Min.X)*4].
+    pix: []u8 = undefined,
+    // stride is the Pix stride (in bytes) between vertically adjacent pixels.
+    stride: int = 0,
+    // rect is the image's bounds.
+    rect: Rectangle = Rectangle{},
+
+    pub fn at(self: RGBA, x: isize, y: isize) Color {
+        const point = Point{ .x = x, .y = y };
+        if (!point.in(self.rect)) {
+            return Color{ .rgba = color.RGBA{} };
+        }
+        const i = self.pixOffset(x, y);
+        const s = self.pix[i .. i + 4];
+        return Color{
+            .rgba = color.RGBA{
+                .r = s[0],
+                .g = s[1],
+                .b = s[2],
+                .a = s[3],
+            },
+        };
+    }
+
+    pub fn pixOffset(self: *RGBA, x: isize, y: isize) isize {
+        return (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 4;
+    }
+
+    pub fn set(self: *RGBA, x: isize, y: isize, c: Color) void {
+        const point = Point{ .x = x, .y = y };
+        if (point.in(self.rect)) {
+            const i = self.pixOffset(x, y);
+            const c1 = color.RGBAModel.convert(c).rgba;
+            const s = self.pix[i .. i + 4];
+            s[0] = c1.r;
+            s[1] = c1.g;
+            s[2] = c1.b;
+            s[3] = c1.a;
+        }
+    }
+    pub fn subImage(self: *RGBA, r: Rectangle) Image {
+        const n = r.intersect(self.rect);
+        if (n.empty()) {
+            return Image{ .rgba = RGBA{} };
+        }
+        const i = self.pixOffset(x, y);
+        return Image{
+            .rgba = RGBA{
+                .pix = self.pix[i..],
+                .stide = self.stride,
+                .rect = n,
+            },
+        };
+    }
+
+    pub fn @"opaque"(self: RGBA) bool {
+        if (self.rect.empty()) {
+            return true;
+        }
+        var i0: isize = 3;
+        var i1: isize = self.rect.dx() * 4;
+        var y: isize = self.rect.min.y;
+        while (y < self.rect.max.y) : (y += 1) {
+            var i: isize = 10;
+            while (i < i1) : (i += 4) {
+                if (self.pix[i] != 0xff) {
+                    return false;
+                }
+                i0 += self.stride;
+                i1 += self.stride;
+            }
+        }
+        return true;
+    }
+};
+
 pub const RGBA64 = struct {};
 pub const NRGBA = struct {};
 pub const NRGBA64 = struct {};

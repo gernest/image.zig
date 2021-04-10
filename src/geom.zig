@@ -3,8 +3,8 @@ const testing = @import("std").testing;
 
 /// A Point is an X, Y coordinate pair. The axes increase right and down.
 pub const Point = struct {
-    x: isize,
-    y: isize,
+    x: isize = 0,
+    y: isize = 0,
 
     pub fn init(x: isize, y: isize) Point {
         return Point{ .x = x, .y = y };
@@ -52,8 +52,8 @@ pub const Point = struct {
 };
 
 pub const Rectangle = struct {
-    min: Point,
-    max: Point,
+    min: Point = Point{},
+    max: Point = Point{},
 
     pub fn init(x0: isize, y0: isize, x1: isize, y1: isize) Rectangle {
         return Rectangle{

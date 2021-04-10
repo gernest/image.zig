@@ -218,10 +218,10 @@ pub const Model = struct {
 /// An alpha-premultiplied color component C has been scaled by alpha (A), so
 /// has valid values 0 <= C <= A.
 pub const RGBA = struct {
-    r: u8,
-    g: u8,
-    b: u8,
-    a: u8,
+    r: u8 = 0,
+    g: u8 = 0,
+    b: u8 = 0,
+    a: u8 = 0,
 
     fn toValue(c: RGBA) Value {
         var r: u32 = c.r;
