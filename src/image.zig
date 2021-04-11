@@ -122,3 +122,5 @@ pub const Alpha = struct {};
 pub const Alpha16 = struct {};
 pub const Gray = struct {};
 pub const Gray16 = struct {};
+pub const YCbCr = struct {};
+pub const NYCbCrA = struct {};

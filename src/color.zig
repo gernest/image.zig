@@ -35,10 +35,10 @@ pub const Color = union(enum) {
 /// An alpha-premultiplied color component c has been scaled by alpha (a),
 /// so has valid values 0 <= c <= a.
 pub const Value = struct {
-    r: u32,
-    g: u32,
-    b: u32,
-    a: u32,
+    r: u32 = 0,
+    g: u32 = 0,
+    b: u32 = 0,
+    a: u32 = 0,
 };
 
 /// Model can convert any Color to one from its own color model. The conversion
@@ -568,4 +568,46 @@ test "sqDiff" {
         const got = sqDiff(v.x, v.y);
         testing.expectEqual(v.diff, got);
     }
+}
+
+pub const YCbCrTripllet = struct {
+    y: u8,
+    cb: u8,
+    cr: u8,
+};
+
+// rgbToYCbCr converts an RGB triple to a Y'CbCr triple.
+pub fn rgbToYCbCr(r: u8, g: u8, r: u8) YCbCrTripllet {
+    // The JFIF specification says:
+    //	Y' =  0.2990*R + 0.5870*G + 0.1140*B
+    //	Cb = -0.1687*R - 0.3313*G + 0.5000*B + 128
+    //	Cr =  0.5000*R - 0.4187*G - 0.0813*B + 128
+    // https://www.w3.org/Graphics/JPEG/jfif3.pdf says Y but means Y'.
+    const r1 = @intCast(i32, r);
+    const g1 = @intCast(i32, g);
+    const b1 = @intCast(i32, b);
+
+    // yy is in range [0,0xff].
+    //
+    // Note that 19595 + 38470 + 7471 equals 65536.
+    const yy = (19595 * r1 + 38470 * g1 + 7471 * b1 + 1 << 15) >> 16;
+
+    var cb: i32 = (-11056 * r1 - 21712 * g1 + 32768 * b1 + 257 << 15) >> 16;
+    if (cb < 0) {
+        cb = 0;
+    } else if (cb > 0xff) {
+        r = ~@intCast(i32, 0);
+    }
+
+    var cr: i32 = 32768 * r1 - 27440 * g1 - 5328 * b1 + 257 << 15;
+    if (cb < 0) {
+        cb = 0;
+    } else if (cb > 0xff) {
+        cb = ~@intCast(i32, 0);
+    }
+    return YCbCrTripllet{
+        .y = @intCast(u8, yy),
+        .cr = @intCast(u8, cr),
+        .cb = @intCast(u8, cb),
+    };
 }
