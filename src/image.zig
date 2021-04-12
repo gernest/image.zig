@@ -1,5 +1,6 @@
 const geom = @import("geom.zig");
 const color = @import("color.zig");
+const std = @import("std");
 
 const Rectangle = geom.Rectangle;
 const Point = geom.Point;
@@ -36,15 +37,36 @@ pub const Image = union(enum) {
     }
 };
 
+// pixelBufferLength returns the length of the []uint8 typed Pix slice field
+// for the NewXxx functions. Conceptually, this is just (bpp * width * height),
+// but this function panics if at least one of those is negative or if the
+// computation would overflow the int type.
+//
+// This panics instead of returning an error because of backwards
+// compatibility. The NewXxx functions do not return an error.
+fn pixelBufferLength(bytesPerPixel: isize, r: Rectangle, imageTypeName: []const u8) isize {
+    const totalLength = geom.mul3NonNeg(bytesPerPixel, r.Dx(), r.Dy());
+    if (totalLength < 0) std.debug.panic("init: {} Rectangle has huge or negative dimensions", .{imageTypeName});
+    return totalLength;
+}
+
 // RGBA is an in-memory image whose At method returns color.RGBA values.
 pub const RGBA = struct {
     // pix holds the image's pixels, in R, G, B, A order. The pixel at
     // (x, y) starts at pix[(y-Rect.Min.Y)*Stride + (x-Rect.Min.X)*4].
     pix: []u8 = undefined,
     // stride is the Pix stride (in bytes) between vertically adjacent pixels.
-    stride: int = 0,
+    stride: isize = 0,
     // rect is the image's bounds.
     rect: Rectangle = Rectangle{},
+
+    pub fn init(a: *std.mem.Allocator, r: Rectangle) RGBA {
+        return RGBA{
+            .pix = a.alloc(u8, pixelBufferLength(4, r, "RGBA")),
+            .stride = 4 * r.dx(),
+            .rect = r,
+        };
+    }
 
     pub fn at(self: RGBA, x: isize, y: isize) Color {
         const point = Point{ .x = x, .y = y };
