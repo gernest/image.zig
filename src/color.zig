@@ -13,17 +13,11 @@ pub const Color = union(enum) {
     gray16: Gray16,
 
     pub fn toValue(self: Color) Value {
-        return switch (self) {
-            .rgba => |v| v.toValue(),
-            .rgba64 => |v| v.toValue(),
-            .nrgba => |v| v.toValue(),
-            .rgba64 => |v| v.toValue(),
-            .alpha => |v| v.toValue(),
-            .alpha16 => |v| v.toValue(),
-            .gray => |v| v.toValue(),
-            .gray16 => |v| v.toValue(),
-            else => unreachable,
-        };
+        return valueFn(self);
+    }
+
+    fn valueFn(v: anytype) Value {
+        return v.toValue();
     }
 };
 
