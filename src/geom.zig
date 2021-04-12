@@ -1,5 +1,6 @@
 const color = @import("color.zig");
 const testing = @import("std").testing;
+const debug = @import("std").debug;
 
 /// A Point is an X, Y coordinate pair. The axes increase right and down.
 pub const Point = struct {
@@ -380,4 +381,96 @@ test "Rectangle" {
             }
         }
     }
+}
+
+// mul3NonNeg returns (x * y * z), unless at least one argument is negative or
+// if the computation overflows the int type, in which case it returns -1.
+pub fn mul3NonNeg(x: isize, y: isize, z: isize) isize {
+    if ((x < 0) or (y < 0) or (z < 0)) return -1;
+    var m = mul64(@intCast(u64, x), @intCast(u64, y));
+    if (m.hi != 0) return -1;
+    m = mul64(m.lo, @intCast(u64, z));
+    if (m.hi != 0) return -1;
+    const a = @intCast(isize, m.lo);
+    if ((a < 0) or @intCast(u64, a) != m.lo) return -1;
+    return a;
+}
+
+const mul64Res = struct {
+    hi: u64,
+    lo: u64,
+};
+
+fn mul64(x: u64, y: u64) mul64Res {
+    const mask32 = (1 << 32) - 1;
+    const x0 = x & mask32;
+    const x1 = x >> 32;
+    const y0 = y & mask32;
+    const y1 = y >> 32;
+    const w0 = x0 * y0;
+    const t = x1 * y0 + (w0 >> 32);
+    var w1 = t & mask32;
+    const w2 = t >> 32;
+    w1 += x0 * y1;
+    const hi = x1 * y1 + w2 + (w1 >> 32);
+    var lo: u64 = undefined;
+    _ = @mulWithOverflow(u64, x, y, &lo);
+    return mul64Res{
+        .hi = hi,
+        .lo = lo,
+    };
+}
+
+test "Mul64" {
+    const _M64: u64 = (1 << 64) - 1;
+    const kase = struct {
+        x: u64,
+        y: u64,
+        want: mul64Res,
+    };
+    const kases = [_]kase{
+        .{
+            .x = 1 << 63,
+            .y = 2,
+            .want = .{
+                .hi = 1,
+                .lo = 0,
+            },
+        },
+        .{
+            .x = 0x3626229738a3b9,
+            .y = 0xd8988a9f1cc4a61,
+            .want = .{
+                .hi = 0x2dd0712657fe8,
+                .lo = 0x9dd6a3364c358319,
+            },
+        },
+        .{
+            .x = _M64,
+            .y = _M64,
+            .want = .{
+                .hi = _M64 - 1,
+                .lo = 1,
+            },
+        },
+    };
+    for (kases) |v, i| {
+        const r = mul64(v.x, v.y);
+        testing.expectEqual(r, v.want);
+    }
+
+    // symetric
+    for (kases) |v, i| {
+        const r = mul64(v.y, v.x);
+        testing.expectEqual(r, v.want);
+    }
+}
+
+// add2NonNeg returns (x + y), unless at least one argument is negative or if
+// the computation overflows the int type, in which case it returns -1.
+pub fn add2NonNeg(x: isize, y: isize) isize {
+    if ((x < 0) or (y < 0)) return -1;
+    const a = x + y;
+    if (a < 0) return -1;
+    return a;
 }
