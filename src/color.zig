@@ -11,6 +11,7 @@ pub const Color = union(enum) {
     alpha16: Alpha16,
     gray: Gray,
     gray16: Gray16,
+    yCbCr: YCbCr,
 
     pub fn toValue(self: Color) Value {
         return valueFn(self);
@@ -204,6 +205,15 @@ pub const Model = struct {
             },
         };
     }
+
+    pub fn yCbCrModel(m: Color) Color {
+        return switch (m) {
+            .yCbCr => m,
+            else => {
+                return Color{ .yCbCr = rgbToYCbCr(m.toValue()) };
+            },
+        };
+    }
 };
 
 /// RGBA represents a traditional 32-bit alpha-premultiplied color, having 8
@@ -384,6 +394,7 @@ pub const AlphaModel = Model{ .convert = Model.alphaModel };
 pub const Alpha16Model = Model{ .convert = Model.alpha16Model };
 pub const GrayModel = Model{ .convert = Model.grayModel };
 pub const Gray16Model = Model{ .convert = Model.gray16Model };
+pub const YCbCrModel = Model{ .convert = Model.yCbCrModel };
 
 pub const Black = Color{ .gray = Gray{ .y = 0 } };
 pub const White = Color{ .gray = Gray{ .y = 0xffff } };
@@ -564,22 +575,16 @@ test "sqDiff" {
     }
 }
 
-pub const YCbCrTripllet = struct {
-    y: u8,
-    cb: u8,
-    cr: u8,
-};
-
 // rgbToYCbCr converts an RGB triple to a Y'CbCr triple.
-pub fn rgbToYCbCr(r: u8, g: u8, r: u8) YCbCrTripllet {
+pub fn rgbToYCbCr(v: Value) YCbCr {
     // The JFIF specification says:
     //	Y' =  0.2990*R + 0.5870*G + 0.1140*B
     //	Cb = -0.1687*R - 0.3313*G + 0.5000*B + 128
     //	Cr =  0.5000*R - 0.4187*G - 0.0813*B + 128
     // https://www.w3.org/Graphics/JPEG/jfif3.pdf says Y but means Y'.
-    const r1 = @intCast(i32, r);
-    const g1 = @intCast(i32, g);
-    const b1 = @intCast(i32, b);
+    const r1 = @intCast(i32, v.r);
+    const g1 = @intCast(i32, v.g);
+    const b1 = @intCast(i32, v.b);
 
     // yy is in range [0,0xff].
     //
@@ -599,9 +604,75 @@ pub fn rgbToYCbCr(r: u8, g: u8, r: u8) YCbCrTripllet {
     } else if (cb > 0xff) {
         cb = ~@intCast(i32, 0);
     }
-    return YCbCrTripllet{
+    return YCbCr{
         .y = @intCast(u8, yy),
         .cr = @intCast(u8, cr),
         .cb = @intCast(u8, cb),
     };
 }
+
+// YCbCr represents a fully opaque 24-bit Y'CbCr color, having 8 bits each for
+// one luma and two chroma components.
+//
+// JPEG, VP8, the MPEG family and other codecs use this color model. Such
+// codecs often use the terms YUV and Y'CbCr interchangeably, but strictly
+// speaking, the term YUV applies only to analog video signals, and Y' (luma)
+// is Y (luminance) after applying gamma correction.
+//
+// Conversion between RGB and Y'CbCr is lossy and there are multiple, slightly
+// different formulae for converting between the two. This package follows
+// the JFIF specification at https://www.w3.org/Graphics/JPEG/jfif3.pdf.
+const YCbCr = struct {
+    y: u8,
+    cb: u8,
+    cr: u8,
+
+    pub fn toVallue(self: YCbCr) Value {
+        // This code is a copy of the YCbCrToRGB function above, except that it
+        // returns values in the range [0, 0xffff] instead of [0, 0xff]. There is a
+        // subtle difference between doing this and having YCbCr satisfy the Color
+        // interface by first converting to an RGBA. The latter loses some
+        // information by going to and from 8 bits per channel.
+        //
+        // For example, this code:
+        //	const y, cb, cr = 0x7f, 0x7f, 0x7f
+        //	r, g, b := color.YCbCrToRGB(y, cb, cr)
+        //	r0, g0, b0, _ := color.YCbCr{y, cb, cr}.RGBA()
+        //	r1, g1, b1, _ := color.RGBA{r, g, b, 0xff}.RGBA()
+        //	fmt.Printf("0x%04x 0x%04x 0x%04x\n", r0, g0, b0)
+        //	fmt.Printf("0x%04x 0x%04x 0x%04x\n", r1, g1, b1)
+        // prints:
+        //	0x7e18 0x808d 0x7db9
+        //	0x7e7e 0x8080 0x7d7d
+        const yy1 = @intCast(i32, self.y) * 0x10101;
+        const cb1 = @intCast(i32, self.cb) - 128;
+        const cr1 = @intCast(i32, self.cr) - 128;
+
+        var r = (yy1 + 91881 * cr1) >> 8;
+        if (r < 0) {
+            r = 0;
+        } else if (r > 0xff) {
+            r = 0xffff;
+        }
+
+        var g = (yy1 - 22554 * cb1 - 46802 * cr1) >> 8;
+        if (g < 0) {
+            g = 0;
+        } else if (g > 0xff) {
+            g = 0xffff;
+        }
+
+        var b = (yy1 + 116130 * cb1) >> 8;
+        if (b < 0) {
+            b = 0;
+        } else if (b > 0xff) {
+            b = 0xffff;
+        }
+        return Value{
+            .r = @intCast(u32, r),
+            .g = @intCast(u32, g),
+            .b = @intCast(u32, b),
+            .a = 0xffff,
+        };
+    }
+};
