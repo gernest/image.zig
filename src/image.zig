@@ -35,6 +35,55 @@ pub const Image = union(enum) {
             else => unreachable,
         };
     }
+
+    pub fn bounds(self: Image) Rectangle {
+        return boundsFn(self);
+    }
+    fn boundsFn(self: anytype) Rectangle {
+        return self.rect;
+    }
+
+    pub fn at(self: Image, x: isize, y: isize) Color {
+        return atFn(self);
+    }
+    fn atFn(self: anytype, x: isize, y: isize) Color {
+        return self.at(x, y);
+    }
+
+    pub fn luminance(self: Image, a: *std.mem.Allocator) !Luminance {
+        const b = self.bounds();
+        const height = b.dx();
+        const width = b.dy();
+        var lu = try a.alloc(u8, height * width);
+        var index: isize = 0;
+        var y: isize = b.min.Y;
+        while (y < b.max.y) : (y += 1) {
+            var x = b.min.x;
+            while (x < b.max.x) : (x += 1) {
+                const c = self.at(x, y).toValue();
+                const lum = (c.r + 2 * c.g + c.b) * 255 / (4 * 0xffff);
+                lu[index] = @intCast(u8, (lum * c.a + (0xffff - c.a) * 255) / 0xffff);
+                index += 1;
+            }
+        }
+        return Luminance{
+            .pix = lu,
+            .dimensions = .{
+                .height = height,
+                .width = width,
+            },
+        };
+    }
+};
+
+const Luminance = struct {
+    pix: []const u8,
+    dimension: Dimension = Dimension{},
+    data: Dimension = Dimension{},
+    pub const Dimension = struct {
+        height: isize = 0,
+        width: isize = 0,
+    };
 };
 
 // pixelBufferLength returns the length of the []uint8 typed Pix slice field
@@ -60,9 +109,9 @@ pub const RGBA = struct {
     // rect is the image's bounds.
     rect: Rectangle = Rectangle{},
 
-    pub fn init(a: *std.mem.Allocator, r: Rectangle) RGBA {
+    pub fn init(a: *std.mem.Allocator, r: Rectangle) !RGBA {
         return RGBA{
-            .pix = a.alloc(u8, pixelBufferLength(4, r, "RGBA")),
+            .pix = try a.alloc(u8, pixelBufferLength(4, r, "RGBA")),
             .stride = 4 * r.dx(),
             .rect = r,
         };
