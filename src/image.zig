@@ -273,6 +273,24 @@ pub const RGBA64 = struct {
             },
         };
     }
+
+    pub fn @"opaque"(self: RGBA64) bool {
+        if (self.rect.empty()) return true;
+        var i0: isize = 6;
+        var i1: isize = self.rect.dx() * 8;
+        var y = self.rect.min.y;
+        while (y < self.rect.max.y) : (y += 1) {
+            var i = i0;
+            while (i < i1) : (i += 8) {
+                if (self.pix[i + 0] != 0xff or self.pix[i + 1] != 0xff) {
+                    return false;
+                }
+                i0 += self.stride;
+                i1 += self.stride;
+            }
+        }
+        return true;
+    }
 };
 
 pub const NRGBA = struct {};
