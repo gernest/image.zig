@@ -80,10 +80,31 @@ const Luminance = struct {
     pix: []const u8,
     dimension: Dimension = Dimension{},
     data: Dimension = Dimension{},
+    left: isize,
+    top: isize,
     pub const Dimension = struct {
         height: isize = 0,
         width: isize = 0,
     };
+
+    pub fn crop(self: Luminance, left: isize, top: isize, width: isize, height: isize) Luminance {
+        if ((left + width > self.data.width) or (top + height > self.data.height)) {
+            std.debug.panic("IllegalArgumentException: Crop rectangle does not fit within image data");
+        }
+        return Luminance{
+            .pix = self.pix,
+            .dimension = .{
+                .height = height,
+                .widht = width,
+            },
+            .data = .{
+                .height = self.height,
+                .width = self.width,
+            },
+            .left = self.left + left,
+            .top = self.top + top,
+        };
+    }
 };
 
 // pixelBufferLength returns the length of the []uint8 typed Pix slice field
