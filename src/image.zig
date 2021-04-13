@@ -207,7 +207,74 @@ pub const RGBA = struct {
     }
 };
 
-pub const RGBA64 = struct {};
+pub const RGBA64 = struct {
+    pix: []u8 = undefined,
+    stride: isize = 0,
+    rect: Rectangle = Rectangle{},
+
+    pub fn init(a: *std.mem.Allocator, r: Rectangle) !RGBA64 {
+        return RGBA64{
+            .pix = try a.alloc(u8, pixelBufferLength(8, r, "RGBA64")),
+            .stride = 8 * r.dx(),
+            .rect = r,
+        };
+    }
+
+    pub fn at(self: RGBA64, x: isize, y: isize) Color {
+        const point = Point{ .x = x, .y = y };
+        if (!point.in(self.rect)) {
+            return RGBA64{};
+        }
+        const i = self.pixOffset(x, y);
+        const s = self.pix[i .. i + 8];
+        return Color{
+            .rgba64 = .{
+                .r = @intCast(u16, s[0]) << 8 | @intCast(u16, s[1]),
+                .g = @intCast(u16, s[2]) << 8 | @intCast(u16, s[3]),
+                .b = @intCast(u16, s[4]) << 8 | @intCast(u16, s[5]),
+                .a = @intCast(u16, s[6]) << 8 | @intCast(u16, s[7]),
+            },
+        };
+    }
+    pub fn pixOffset(self: RGBA64, x: isize, y: isize) isize {
+        return (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 8;
+    }
+
+    pub fn set(self: RGBA64, c: Color) void {
+        const point = Point{ .x = x, .y = y };
+        if (point.in(self.rect)) {
+            const i = self.pixOffset(x, y);
+            const c1 = c.toValue();
+            var s = self.pix[i .. i + 8];
+            s[0] = @intCast(u8, c1.r >> 8);
+            s[1] = @intCast(u8, c1.r);
+            s[2] = @intCast(u8, c1.g >> 8);
+            s[3] = @intCast(u8, c1.g);
+            s[4] = @intCast(u8, c1.b >> 8);
+            s[5] = @intCast(u8, c1.b);
+            s[6] = @intCast(u8, c1.a >> 8);
+            s[7] = @intCast(u8, c1.a);
+        }
+    }
+
+    pub fn subImage(self: RGBA64, r: Rectangle) Image {
+        const n = r.intersect(self.rect);
+        if (n.empty()) {
+            return Image{
+                .rgba64 = RGBA64{},
+            };
+        }
+        const i = self.pixOffset(r.min.x, r.min.y);
+        return Image{
+            .rgba64 = RGBA64{
+                .pix = self.pix[i..],
+                .stride = self.stride,
+                .rect = r,
+            },
+        };
+    }
+};
+
 pub const NRGBA = struct {};
 pub const NRGBA64 = struct {};
 pub const Alpha = struct {};
