@@ -6,7 +6,7 @@ pub const Color = union(enum) {
     rgba: RGBA,
     rgba64: RGBA64,
     nrgba: NRGBA,
-    nrgba64: NBRGBA64,
+    nrgba64: NRGBA64,
     alpha: Alpha,
     alpha16: Alpha16,
     gray: Gray,
@@ -14,11 +14,17 @@ pub const Color = union(enum) {
     yCbCr: YCbCr,
 
     pub fn toValue(self: Color) Value {
-        return valueFn(self);
-    }
-
-    fn valueFn(v: anytype) Value {
-        return v.toValue();
+        return switch (self) {
+            .rgba => |i| i.toValue(),
+            .rgba64 => |i| i.toValue(),
+            .nrgba => |i| i.toValue(),
+            .nrgba64 => |i| i.toValue(),
+            .alpha => |i| i.toValue(),
+            .alpha16 => |i| i.toValue(),
+            .gray => |i| i.toValue(),
+            .gray16 => |i| i.toValue(),
+            .yCbCr => |i| i.toValue(),
+        };
     }
 };
 
@@ -34,6 +40,10 @@ pub const Value = struct {
     g: u32 = 0,
     b: u32 = 0,
     a: u32 = 0,
+
+    pub fn eq(self: Value, n: Value) bool {
+        return self.r == n.r and self.g == n.g and self.b == n.b and self.a == n.a;
+    }
 };
 
 /// Model can convert any Color to one from its own color model. The conversion
@@ -63,10 +73,10 @@ pub const Model = struct {
             else => {
                 const c = m.toValue();
                 const model = RGBA64{
-                    .r = c.r,
-                    .g = c.g,
-                    .b = c.b,
-                    .a = c.a,
+                    .r = @intCast(u16, c.r),
+                    .g = @intCast(u16, c.g),
+                    .b = @intCast(u16, c.b),
+                    .a = @intCast(u16, c.a),
                 };
                 return Color{ .rgba64 = model };
             },
@@ -117,9 +127,9 @@ pub const Model = struct {
                 const c = m.toValue();
                 if (c.a == 0xffff) {
                     const model = NRGBA64{
-                        .r = c.r,
-                        .g = c.g,
-                        .b = c.b,
+                        .r = @intCast(u16, c.r),
+                        .g = @intCast(u16, c.g),
+                        .b = @intCast(u16, c.b),
                         .a = 0xff,
                     };
                     return Color{ .nrgba64 = model };
@@ -137,10 +147,10 @@ pub const Model = struct {
                 var g = (c.g * 0xffff) / c.a;
                 var b = (c.b * 0xffff) / c.a;
                 const model = NRGBA64{
-                    .r = r,
-                    .g = g,
-                    .b = b,
-                    .a = c.a,
+                    .r = @intCast(u16, r),
+                    .g = @intCast(u16, g),
+                    .b = @intCast(u16, b),
+                    .a = @intCast(u16, c.a),
                 };
                 return Color{ .nrgba64 = model };
             },
@@ -272,7 +282,7 @@ pub const NRGBA = struct {
     b: u8,
     a: u8,
 
-    fn toColor(c: NBRGBA) Value {
+    fn toValue(c: NRGBA) Value {
         var r: u32 = c.r;
         var g: u32 = c.g;
         var b: u32 = c.b;
@@ -296,13 +306,13 @@ pub const NRGBA = struct {
     }
 };
 
-pub const NBRGBA64 = struct {
+pub const NRGBA64 = struct {
     r: u16,
     g: u16,
     b: u16,
     a: u16,
 
-    fn toColor(c: NBRGBA64) Value {
+    fn toValue(c: NRGBA64) Value {
         var r: u32 = c.r;
         var g: u32 = c.g;
         var b: u32 = c.b;
@@ -627,7 +637,7 @@ const YCbCr = struct {
     cb: u8,
     cr: u8,
 
-    pub fn toVallue(self: YCbCr) Value {
+    pub fn toValue(self: YCbCr) Value {
         // This code is a copy of the YCbCrToRGB function above, except that it
         // returns values in the range [0, 0xffff] instead of [0, 0xff]. There is a
         // subtle difference between doing this and having YCbCr satisfy the Color

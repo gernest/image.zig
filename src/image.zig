@@ -1,6 +1,7 @@
 const geom = @import("geom.zig");
 const color = @import("color.zig");
 const std = @import("std");
+const testing = std.testing;
 
 const Rectangle = geom.Rectangle;
 const Point = geom.Point;
@@ -16,7 +17,7 @@ pub const Image = union(enum) {
     rgba: RGBA,
     rgba64: RGBA64,
     nrgba: NRGBA,
-    nrgba64: NBRGBA64,
+    nrgba64: NRGBA64,
     alpha: Alpha,
     alpha16: Alpha16,
     gray: Gray,
@@ -32,22 +33,61 @@ pub const Image = union(enum) {
             .alpha16 => color.Alpha16Model,
             .gray => color.GrayModel,
             .gray16 => color.Gray16Model,
-            else => unreachable,
         };
     }
 
     pub fn bounds(self: Image) Rectangle {
-        return boundsFn(self);
-    }
-    fn boundsFn(self: anytype) Rectangle {
-        return self.rect;
+        return switch (self) {
+            .rgba => |i| i.rect,
+            .rgba64 => |i| i.rect,
+            .nrgba => |i| i.rect,
+            .nrgba64 => |i| i.rect,
+            .alpha => |i| i.rect,
+            .alpha16 => |i| i.rect,
+            .gray => |i| i.rect,
+            .gray16 => |i| i.rect,
+        };
     }
 
-    pub fn at(self: Image, x: isize, y: isize) Color {
-        return atFn(self);
+    // used for testing. This returns underlying pix slice for easily freeing up
+    // test images
+    fn pix(self: Image) []u8 {
+        return switch (self) {
+            .rgba => |i| i.pix,
+            .rgba64 => |i| i.pix,
+            .nrgba => |i| i.pix,
+            .nrgba64 => |i| i.pix,
+            .alpha => |i| i.pix,
+            .alpha16 => |i| i.pix,
+            .gray => |i| i.pix,
+            .gray16 => |i| i.pix,
+        };
     }
-    fn atFn(self: anytype, x: isize, y: isize) Color {
-        return self.at(x, y);
+
+    pub fn at(self: Image, x: isize, y: isize) ?Color {
+        return switch (self) {
+            .rgba => |i| i.at(x, y),
+            .rgba64 => |i| i.at(x, y),
+            .nrgba => |i| i.at(x, y),
+            .nrgba64 => |i| i.at(x, y),
+            .alpha => |i| i.at(x, y),
+            .alpha16 => |i| i.at(x, y),
+            .gray => |i| i.at(x, y),
+            .gray16 => |i| i.at(x, y),
+        };
+    }
+
+    pub fn set(self: Image, x: isize, y: isize, c: Color) void {
+        switch (self) {
+            .rgba => |i| i.set(x, y, c),
+            .rgba64 => |i| i.set(x, y, c),
+            .nrgba => |i| i.set(x, y, c),
+            .nrgba64 => |i| i.set(x, y, c),
+            .alpha => |i| i.set(x, y, c),
+            .alpha16 => |i| i.set(x, y, c),
+            .gray => |i| i.set(x, y, c),
+            .gray16 => |i| i.set(x, y, c),
+        }
     }
 
     pub fn luminance(self: Image, a: *std.mem.Allocator) !Luminance {
@@ -114,10 +154,19 @@ const Luminance = struct {
 //
 // This panics instead of returning an error because of backwards
 // compatibility. The NewXxx functions do not return an error.
-fn pixelBufferLength(bytesPerPixel: isize, r: Rectangle, imageTypeName: []const u8) isize {
-    const totalLength = geom.mul3NonNeg(bytesPerPixel, r.Dx(), r.Dy());
-    if (totalLength < 0) std.debug.panic("init: {} Rectangle has huge or negative dimensions", .{imageTypeName});
-    return totalLength;
+fn pixelBufferLength(bytesPerPixel: isize, r: Rectangle, imageTypeName: []const u8) usize {
+    const totalLength = geom.mul3NonNeg(bytesPerPixel, r.dx(), r.dy());
+    if (totalLength < 0) std.debug.panic("init: {any} Rectangle has huge or negative dimensions", .{imageTypeName});
+    return @intCast(usize, totalLength);
+}
+
+fn createPix(a: *std.mem.Allocator, size: isize, r: Rectangle, name: []const u8) ![]u8 {
+    var pix = try a.alloc(u8, pixelBufferLength(size, r, "RGBA"));
+    var i: usize = 0;
+    while (i < pix.len) : (i += 1) {
+        pix[i] = 0;
+    }
+    return pix;
 }
 
 // RGBA is an in-memory image whose At method returns color.RGBA values.
@@ -132,17 +181,15 @@ pub const RGBA = struct {
 
     pub fn init(a: *std.mem.Allocator, r: Rectangle) !RGBA {
         return RGBA{
-            .pix = try a.alloc(u8, pixelBufferLength(4, r, "RGBA")),
+            .pix = try createPix(a, 4, r, "RGBA"),
             .stride = 4 * r.dx(),
             .rect = r,
         };
     }
 
-    pub fn at(self: RGBA, x: isize, y: isize) Color {
+    pub fn at(self: RGBA, x: isize, y: isize) ?Color {
         const point = Point{ .x = x, .y = y };
-        if (!point.in(self.rect)) {
-            return Color{ .rgba = color.RGBA{} };
-        }
+        if (!point.in(self.rect)) return null;
         const i = self.pixOffset(x, y);
         const s = self.pix[i .. i + 4];
         return Color{
@@ -155,11 +202,12 @@ pub const RGBA = struct {
         };
     }
 
-    pub fn pixOffset(self: *RGBA, x: isize, y: isize) isize {
-        return (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 4;
+    pub fn pixOffset(self: RGBA, x: isize, y: isize) usize {
+        const v = (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 4;
+        return @intCast(usize, v);
     }
 
-    pub fn set(self: *RGBA, x: isize, y: isize, c: Color) void {
+    pub fn set(self: RGBA, x: isize, y: isize, c: Color) void {
         const point = Point{ .x = x, .y = y };
         if (point.in(self.rect)) {
             const i = self.pixOffset(x, y);
@@ -171,7 +219,7 @@ pub const RGBA = struct {
             s[3] = c1.a;
         }
     }
-    pub fn subImage(self: *RGBA, r: Rectangle) Image {
+    pub fn subImage(self: RGBA, r: Rectangle) Image {
         const n = r.intersect(self.rect);
         if (n.empty()) {
             return Image{ .rgba = RGBA{} };
@@ -220,11 +268,9 @@ pub const RGBA64 = struct {
         };
     }
 
-    pub fn at(self: RGBA64, x: isize, y: isize) Color {
+    pub fn at(self: RGBA64, x: isize, y: isize) ?Color {
         const point = Point{ .x = x, .y = y };
-        if (!point.in(self.rect)) {
-            return RGBA64{};
-        }
+        if (!point.in(self.rect)) return null;
         const i = self.pixOffset(x, y);
         const s = self.pix[i .. i + 8];
         return Color{
@@ -236,8 +282,9 @@ pub const RGBA64 = struct {
             },
         };
     }
-    pub fn pixOffset(self: RGBA64, x: isize, y: isize) isize {
-        return (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 8;
+    pub fn pixOffset(self: RGBA64, x: isize, y: isize) usize {
+        const v = (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 8;
+        return @intCast(usize, v);
     }
 
     pub fn set(self: RGBA64, c: Color) void {
@@ -365,14 +412,104 @@ pub const NRGBA = struct {
         return true;
     }
 
-    pub fn pixOffset(self: NRGBA, x: isize, y: isize) isize {
-        return (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 4;
+    pub fn pixOffset(self: NRGBA, x: isize, y: isize) usize {
+        const v = (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 4;
+        return @intCast(usize, v);
     }
 };
-pub const NRGBA64 = struct {};
-pub const Alpha = struct {};
-pub const Alpha16 = struct {};
-pub const Gray = struct {};
-pub const Gray16 = struct {};
-pub const YCbCr = struct {};
-pub const NYCbCrA = struct {};
+pub const NRGBA64 = struct {
+    pix: []u8,
+    stride: isize,
+    rect: Rectangle,
+
+    pub fn at(self: NRGBA64, x: isize, y: isize) ?Color {
+        return null;
+    }
+};
+
+pub const Alpha = struct {
+    pix: []u8,
+    stride: isize,
+    rect: Rectangle,
+
+    pub fn at(self: Alpha, x: isize, y: isize) ?Color {
+        return null;
+    }
+};
+pub const Alpha16 = struct {
+    pix: []u8,
+    stride: isize,
+    rect: Rectangle,
+
+    pub fn at(self: Alpha16, x: isize, y: isize) ?Color {
+        return null;
+    }
+};
+pub const Gray = struct {
+    pix: []u8,
+    stride: isize,
+    rect: Rectangle,
+
+    pub fn at(self: Gray, x: isize, y: isize) ?Color {
+        return null;
+    }
+};
+pub const Gray16 = struct {
+    pix: []u8,
+    stride: isize,
+    rect: Rectangle,
+
+    pub fn at(self: Gray16, x: isize, y: isize) ?Color {
+        return null;
+    }
+};
+
+pub const CMYK = struct {};
+
+pub const YCbCr = struct {
+    pix: []u8,
+    stride: isize,
+    rect: Rectangle,
+};
+
+pub const NYCbCrA = struct {
+    pix: []u8,
+    stride: isize,
+    rect: Rectangle,
+};
+
+fn cmp(cm: color.Model, c0: Color, c1: Color) bool {
+    // std.debug.print("\nc0={any} c1={any}\n", .{ c0, c1 });
+    const v0 = cm.convert(c0).toValue();
+    const v1 = cm.convert(c1).toValue();
+    // std.debug.print("\nv0={any} v1={any}\n", .{ v0, v1 });
+    return v0.eq(v1);
+}
+
+test "Image" {
+    const AllocationError = error{
+        OutOfMemory,
+    };
+    const initImage = struct {
+        init: fn () AllocationError!Image,
+
+        fn rgba() !Image {
+            return Image{
+                .rgba = try RGBA.init(testing.allocator, Rectangle.init(0, 0, 10, 10)),
+            };
+        }
+    };
+    const testImages = [_]initImage{
+        .{ .init = initImage.rgba },
+    };
+
+    for (testImages) |tc| {
+        const m = try tc.init();
+
+        const r = Rectangle.init(0, 0, 10, 10);
+        testing.expect(r.eq(m.bounds()));
+
+        testing.expect(cmp(m.colorModel(), color.Transparent, m.at(6, 3).?));
+        testing.allocator.free(m.pix());
+    }
+}
