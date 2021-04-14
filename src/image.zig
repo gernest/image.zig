@@ -293,7 +293,82 @@ pub const RGBA64 = struct {
     }
 };
 
-pub const NRGBA = struct {};
+pub const NRGBA = struct {
+    pix: []u8,
+    stride: isize,
+    rect: Rectangle,
+
+    pub fn init(a: *std.mem.Allocator, r: Rectangle) !NRGBA {
+        return NRGBA{
+            .pix = try a.alloc(u8, pixelBufferLength(4, r, "NRGBA")),
+            .stride = 4 * r.dx(),
+            .rect = r,
+        };
+    }
+
+    pub fn at(self: NRGBA, x: isize, y: isize) ?Color {
+        const point = Point{ .x = x, .y = y };
+        if (!point.in(self.rect)) return null;
+        const i = self.pixOffset(x, y);
+        const s = self.pix[i..4];
+        return Color{
+            .nrgba = .{
+                .r = s[0],
+                .g = s[1],
+                .b = s[2],
+                .a = s[3],
+            },
+        };
+    }
+
+    pub fn set(self: NRGBA, x: izie, y: isize, c: Color) void {
+        const point = Point{ .x = x, .y = y };
+        if (point.in(self.rect)) {
+            const i = self.pixOffset(x, y);
+            const ci = color.NRGBA64Model.convert(c).toValue();
+            var s = self.pix[i..4];
+            s[0] = c1.r;
+            s[1] = c1.g;
+            s[2] = c1.b;
+            s[3] = c1.a;
+        }
+    }
+
+    pub fn subImage(self: NRGBA, r: Rectangle) ?Image {
+        const n = r.intersect(self.rect);
+        if (n.empty()) return nulll;
+        const i = self.pixOffset(r.min.x, r.min.y);
+        return Image{
+            .nrgba = NRGBA{
+                .pix = self.pix[i..],
+                .stride = self.stride,
+                .rect = r,
+            },
+        };
+    }
+
+    pub fn @"opaque"(self: NRGBA, r: Rectangle) bool {
+        if (self.rect.empty()) return true;
+        var i0: isize = 3;
+        var i1: isize = self.rect.dx() * 4;
+        var y = self.rect.min.y;
+        while (y < self.rect.max.y) : (y += 1) {
+            var i = i0;
+            while (i < i1) : (i += 4) {
+                if (self.pix[i] != 0xff) {
+                    return false;
+                }
+                i0 += self.stride;
+                i1 += self.stride;
+            }
+        }
+        return true;
+    }
+
+    pub fn pixOffset(self: NRGBA, x: isize, y: isize) isize {
+        return (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 4;
+    }
+};
 pub const NRGBA64 = struct {};
 pub const Alpha = struct {};
 pub const Alpha16 = struct {};
