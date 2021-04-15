@@ -57,10 +57,10 @@ pub const Model = struct {
             else => {
                 const c = m.toValue();
                 const model = RGBA{
-                    .r = @intCast(u8, c.r >> 8),
-                    .g = @intCast(u8, c.g >> 8),
-                    .b = @intCast(u8, c.b >> 8),
-                    .a = @intCast(u8, c.a >> 8),
+                    .r = @truncate(u8, c.r >> 8),
+                    .g = @truncate(u8, c.g >> 8),
+                    .b = @truncate(u8, c.b >> 8),
+                    .a = @truncate(u8, c.a >> 8),
                 };
                 return Color{ .rgba = model };
             },

@@ -211,12 +211,12 @@ pub const RGBA = struct {
         const point = Point{ .x = x, .y = y };
         if (point.in(self.rect)) {
             const i = self.pixOffset(x, y);
-            const c1 = color.RGBAModel.convert(c).rgba;
+            const c1 = color.RGBAModel.convert(c).toValue();
             const s = self.pix[i .. i + 4];
-            s[0] = c1.r;
-            s[1] = c1.g;
-            s[2] = c1.b;
-            s[3] = c1.a;
+            s[0] = @truncate(u8, c1.r);
+            s[1] = @truncate(u8, c1.g);
+            s[2] = @truncate(u8, c1.b);
+            s[3] = @truncate(u8, c1.a);
         }
     }
     pub fn subImage(self: RGBA, r: Rectangle) Image {
@@ -287,11 +287,11 @@ pub const RGBA64 = struct {
         return @intCast(usize, v);
     }
 
-    pub fn set(self: RGBA64, c: Color) void {
+    pub fn set(self: RGBA64, x: isize, y: isize, c: Color) void {
         const point = Point{ .x = x, .y = y };
         if (point.in(self.rect)) {
             const i = self.pixOffset(x, y);
-            const c1 = c.toValue();
+            const c1 = color.RGBA64Model.convert(c).toValue();
             var s = self.pix[i .. i + 8];
             s[0] = @intCast(u8, c1.r >> 8);
             s[1] = @intCast(u8, c1.r);
@@ -368,16 +368,16 @@ pub const NRGBA = struct {
         };
     }
 
-    pub fn set(self: NRGBA, x: izie, y: isize, c: Color) void {
+    pub fn set(self: NRGBA, x: isize, y: isize, c: Color) void {
         const point = Point{ .x = x, .y = y };
         if (point.in(self.rect)) {
             const i = self.pixOffset(x, y);
-            const ci = color.NRGBA64Model.convert(c).toValue();
+            const c1 = color.NRGBA64Model.convert(c).toValue();
             var s = self.pix[i..4];
-            s[0] = c1.r;
-            s[1] = c1.g;
-            s[2] = c1.b;
-            s[3] = c1.a;
+            s[0] = @intCast(u8, c1.r);
+            s[1] = @intCast(u8, c1.g);
+            s[2] = @intCast(u8, c1.b);
+            s[3] = @intCast(u8, c1.a);
         }
     }
 
@@ -425,6 +425,7 @@ pub const NRGBA64 = struct {
     pub fn at(self: NRGBA64, x: isize, y: isize) ?Color {
         return null;
     }
+    pub fn set(self: NRGBA64, x: isize, y: isize, c: Color) void {}
 };
 
 pub const Alpha = struct {
@@ -435,6 +436,7 @@ pub const Alpha = struct {
     pub fn at(self: Alpha, x: isize, y: isize) ?Color {
         return null;
     }
+    pub fn set(self: Alpha, x: isize, y: isize, c: Color) void {}
 };
 pub const Alpha16 = struct {
     pix: []u8,
@@ -444,6 +446,7 @@ pub const Alpha16 = struct {
     pub fn at(self: Alpha16, x: isize, y: isize) ?Color {
         return null;
     }
+    pub fn set(self: Alpha16, x: isize, y: isize, c: Color) void {}
 };
 pub const Gray = struct {
     pix: []u8,
@@ -453,6 +456,7 @@ pub const Gray = struct {
     pub fn at(self: Gray, x: isize, y: isize) ?Color {
         return null;
     }
+    pub fn set(self: Gray, x: isize, y: isize, c: Color) void {}
 };
 pub const Gray16 = struct {
     pix: []u8,
@@ -462,6 +466,7 @@ pub const Gray16 = struct {
     pub fn at(self: Gray16, x: isize, y: isize) ?Color {
         return null;
     }
+    pub fn set(self: Gray16, x: isize, y: isize, c: Color) void {}
 };
 
 pub const CMYK = struct {};
@@ -510,6 +515,10 @@ test "Image" {
         testing.expect(r.eq(m.bounds()));
 
         testing.expect(cmp(m.colorModel(), color.Transparent, m.at(6, 3).?));
+
+        m.set(6, 3, color.Opaque);
+        testing.expect(cmp(m.colorModel(), color.Opaque, m.at(6, 3).?));
+
         testing.allocator.free(m.pix());
     }
 }
