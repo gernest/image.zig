@@ -2,6 +2,7 @@ const geom = @import("geom.zig");
 const color = @import("color.zig");
 const std = @import("std");
 const testing = std.testing;
+const print = std.debug.print;
 
 const Rectangle = geom.Rectangle;
 const Point = geom.Point;
@@ -88,6 +89,32 @@ pub const Image = union(enum) {
             .gray => |i| i.set(x, y, c),
             .gray16 => |i| i.set(x, y, c),
         }
+    }
+
+    pub fn subImage(self: Image, r: Rectangle) ?Image {
+        return switch (self) {
+            .rgba => |i| i.subImage(r),
+            .rgba64 => |i| i.subImage(r),
+            .nrgba => |i| i.subImage(r),
+            .nrgba64 => |i| i.subImage(r),
+            .alpha => |i| i.subImage(r),
+            .alpha16 => |i| i.subImage(r),
+            .gray => |i| i.subImage(r),
+            .gray16 => |i| i.subImage(r),
+        };
+    }
+
+    pub fn @"opaque"(self: Image) bool {
+        return switch (self) {
+            .rgba => |i| i.@"opaque"(),
+            .rgba64 => |i| i.@"opaque"(),
+            .nrgba => |i| i.@"opaque"(),
+            .nrgba64 => |i| i.@"opaque"(),
+            .alpha => |i| i.@"opaque"(),
+            .alpha16 => |i| i.@"opaque"(),
+            .gray => |i| i.@"opaque"(),
+            .gray16 => |i| i.@"opaque"(),
+        };
     }
 
     pub fn luminance(self: Image, a: *std.mem.Allocator) !Luminance {
@@ -219,16 +246,14 @@ pub const RGBA = struct {
             s[3] = @truncate(u8, c1.a);
         }
     }
-    pub fn subImage(self: RGBA, r: Rectangle) Image {
+    pub fn subImage(self: RGBA, r: Rectangle) ?Image {
         const n = r.intersect(self.rect);
-        if (n.empty()) {
-            return Image{ .rgba = RGBA{} };
-        }
-        const i = self.pixOffset(x, y);
+        if (n.empty()) return null;
+        const i = self.pixOffset(r.min.x, r.min.y);
         return Image{
             .rgba = RGBA{
                 .pix = self.pix[i..],
-                .stide = self.stride,
+                .stride = self.stride,
                 .rect = n,
             },
         };
@@ -238,18 +263,18 @@ pub const RGBA = struct {
         if (self.rect.empty()) {
             return true;
         }
-        var i0: isize = 3;
-        var i1: isize = self.rect.dx() * 4;
+        var i_0: isize = 3;
+        var i_1: isize = self.rect.dx() * 4;
         var y: isize = self.rect.min.y;
         while (y < self.rect.max.y) : (y += 1) {
-            var i: isize = 10;
-            while (i < i1) : (i += 4) {
-                if (self.pix[i] != 0xff) {
+            var i: isize = i_0;
+            while (i < i_1) : (i += 4) {
+                if (self.pix[@intCast(usize, i)] != 0xff) {
                     return false;
                 }
-                i0 += self.stride;
-                i1 += self.stride;
             }
+            i_0 += self.stride;
+            i_1 += self.stride;
         }
         return true;
     }
@@ -304,13 +329,9 @@ pub const RGBA64 = struct {
         }
     }
 
-    pub fn subImage(self: RGBA64, r: Rectangle) Image {
+    pub fn subImage(self: RGBA64, r: Rectangle) ?Image {
         const n = r.intersect(self.rect);
-        if (n.empty()) {
-            return Image{
-                .rgba64 = RGBA64{},
-            };
-        }
+        if (n.empty()) return null;
         const i = self.pixOffset(r.min.x, r.min.y);
         return Image{
             .rgba64 = RGBA64{
@@ -323,17 +344,17 @@ pub const RGBA64 = struct {
 
     pub fn @"opaque"(self: RGBA64) bool {
         if (self.rect.empty()) return true;
-        var i0: isize = 6;
-        var i1: isize = self.rect.dx() * 8;
+        var i_0: isize = 6;
+        var i_1: isize = self.rect.dx() * 8;
         var y = self.rect.min.y;
         while (y < self.rect.max.y) : (y += 1) {
-            var i = i0;
-            while (i < i1) : (i += 8) {
-                if (self.pix[i + 0] != 0xff or self.pix[i + 1] != 0xff) {
+            var i = i_0;
+            while (i < i_1) : (i += 8) {
+                if (self.pix[@intCast(usize, i) + 0] != 0xff or self.pix[@intCast(usize, i) + 1] != 0xff) {
                     return false;
                 }
-                i0 += self.stride;
-                i1 += self.stride;
+                i_0 += self.stride;
+                i_1 += self.stride;
             }
         }
         return true;
@@ -383,7 +404,7 @@ pub const NRGBA = struct {
 
     pub fn subImage(self: NRGBA, r: Rectangle) ?Image {
         const n = r.intersect(self.rect);
-        if (n.empty()) return nulll;
+        if (n.empty()) return null;
         const i = self.pixOffset(r.min.x, r.min.y);
         return Image{
             .nrgba = NRGBA{
@@ -394,19 +415,19 @@ pub const NRGBA = struct {
         };
     }
 
-    pub fn @"opaque"(self: NRGBA, r: Rectangle) bool {
+    pub fn @"opaque"(self: NRGBA) bool {
         if (self.rect.empty()) return true;
-        var i0: isize = 3;
-        var i1: isize = self.rect.dx() * 4;
+        var i_0: isize = 3;
+        var i_1: isize = self.rect.dx() * 4;
         var y = self.rect.min.y;
         while (y < self.rect.max.y) : (y += 1) {
-            var i = i0;
-            while (i < i1) : (i += 4) {
-                if (self.pix[i] != 0xff) {
+            var i = i_0;
+            while (i < i_1) : (i += 4) {
+                if (self.pix[@intCast(usize, i)] != 0xff) {
                     return false;
                 }
-                i0 += self.stride;
-                i1 += self.stride;
+                i_0 += self.stride;
+                i_1 += self.stride;
             }
         }
         return true;
@@ -426,6 +447,12 @@ pub const NRGBA64 = struct {
         return null;
     }
     pub fn set(self: NRGBA64, x: isize, y: isize, c: Color) void {}
+    pub fn subImage(self: NRGBA64, r: Rectangle) ?Image {
+        return null;
+    }
+    pub fn @"opaque"(self: NRGBA64) bool {
+        return false;
+    }
 };
 
 pub const Alpha = struct {
@@ -437,6 +464,12 @@ pub const Alpha = struct {
         return null;
     }
     pub fn set(self: Alpha, x: isize, y: isize, c: Color) void {}
+    pub fn subImage(self: Alpha, r: Rectangle) ?Image {
+        return null;
+    }
+    pub fn @"opaque"(self: Alpha) bool {
+        return false;
+    }
 };
 pub const Alpha16 = struct {
     pix: []u8,
@@ -447,6 +480,12 @@ pub const Alpha16 = struct {
         return null;
     }
     pub fn set(self: Alpha16, x: isize, y: isize, c: Color) void {}
+    pub fn subImage(self: Alpha16, r: Rectangle) ?Image {
+        return null;
+    }
+    pub fn @"opaque"(self: Alpha16) bool {
+        return false;
+    }
 };
 pub const Gray = struct {
     pix: []u8,
@@ -457,6 +496,12 @@ pub const Gray = struct {
         return null;
     }
     pub fn set(self: Gray, x: isize, y: isize, c: Color) void {}
+    pub fn subImage(self: Gray, r: Rectangle) ?Image {
+        return null;
+    }
+    pub fn @"opaque"(self: Gray) bool {
+        return false;
+    }
 };
 pub const Gray16 = struct {
     pix: []u8,
@@ -467,6 +512,12 @@ pub const Gray16 = struct {
         return null;
     }
     pub fn set(self: Gray16, x: isize, y: isize, c: Color) void {}
+    pub fn subImage(self: Gray16, r: Rectangle) ?Image {
+        return null;
+    }
+    pub fn @"opaque"(self: Gray16) bool {
+        return false;
+    }
 };
 
 pub const CMYK = struct {};
@@ -519,6 +570,7 @@ test "Image" {
         m.set(6, 3, color.Opaque);
         testing.expect(cmp(m.colorModel(), color.Opaque, m.at(6, 3).?));
 
+        testing.expect(m.subImage(Rectangle.rect(6, 3, 7, 4)).?.@"opaque"());
         testing.allocator.free(m.pix());
     }
 }
