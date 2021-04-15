@@ -571,6 +571,19 @@ test "Image" {
         testing.expect(cmp(m.colorModel(), color.Opaque, m.at(6, 3).?));
 
         testing.expect(m.subImage(Rectangle.rect(6, 3, 7, 4)).?.@"opaque"());
+
+        const m2 = m.subImage(Rectangle.rect(3, 2, 9, 8)).?;
+        testing.expect(Rectangle.rect(3, 2, 9, 8).eq(m2.bounds()));
+
+        testing.expect(cmp(m2.colorModel(), color.Opaque, m2.at(6, 3).?));
+        testing.expect(cmp(m2.colorModel(), color.Transparent, m2.at(3, 3).?));
+        m2.set(3, 3, color.Opaque);
+        testing.expect(cmp(m2.colorModel(), color.Opaque, m2.at(3, 3).?));
+
+        _ = m2.subImage(Rectangle.rect(0, 0, 0, 0));
+        _ = m2.subImage(Rectangle.rect(10, 0, 10, 0));
+        _ = m2.subImage(Rectangle.rect(0, 10, 0, 10));
+        _ = m2.subImage(Rectangle.rect(10, 10, 10, 10));
         testing.allocator.free(m.pix());
     }
 }
