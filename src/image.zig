@@ -246,6 +246,7 @@ pub const RGBA = struct {
             s[3] = @truncate(u8, c1.a);
         }
     }
+
     pub fn subImage(self: RGBA, r: Rectangle) ?Image {
         const n = r.intersect(self.rect);
         if (n.empty()) return null;
@@ -287,7 +288,7 @@ pub const RGBA64 = struct {
 
     pub fn init(a: *std.mem.Allocator, r: Rectangle) !RGBA64 {
         return RGBA64{
-            .pix = try a.alloc(u8, pixelBufferLength(8, r, "RGBA64")),
+            .pix = try createPix(a, 8, r, "RGBA64"),
             .stride = 8 * r.dx(),
             .rect = r,
         };
@@ -300,7 +301,7 @@ pub const RGBA64 = struct {
         const s = self.pix[i .. i + 8];
         return Color{
             .rgba64 = .{
-                .r = @intCast(u16, s[0]) << 8 | @intCast(u16, s[1]),
+                .r = (@intCast(u16, s[0]) << 8) | @intCast(u16, s[1]),
                 .g = @intCast(u16, s[2]) << 8 | @intCast(u16, s[3]),
                 .b = @intCast(u16, s[4]) << 8 | @intCast(u16, s[5]),
                 .a = @intCast(u16, s[6]) << 8 | @intCast(u16, s[7]),
@@ -318,14 +319,14 @@ pub const RGBA64 = struct {
             const i = self.pixOffset(x, y);
             const c1 = color.RGBA64Model.convert(c).toValue();
             var s = self.pix[i .. i + 8];
-            s[0] = @intCast(u8, c1.r >> 8);
-            s[1] = @intCast(u8, c1.r);
-            s[2] = @intCast(u8, c1.g >> 8);
-            s[3] = @intCast(u8, c1.g);
-            s[4] = @intCast(u8, c1.b >> 8);
-            s[5] = @intCast(u8, c1.b);
-            s[6] = @intCast(u8, c1.a >> 8);
-            s[7] = @intCast(u8, c1.a);
+            s[0] = @truncate(u8, c1.r >> 8);
+            s[1] = @truncate(u8, c1.r);
+            s[2] = @truncate(u8, c1.g >> 8);
+            s[3] = @truncate(u8, c1.g);
+            s[4] = @truncate(u8, c1.b >> 8);
+            s[5] = @truncate(u8, c1.b);
+            s[6] = @truncate(u8, c1.a >> 8);
+            s[7] = @truncate(u8, c1.a);
         }
     }
 
@@ -353,9 +354,9 @@ pub const RGBA64 = struct {
                 if (self.pix[@intCast(usize, i) + 0] != 0xff or self.pix[@intCast(usize, i) + 1] != 0xff) {
                     return false;
                 }
-                i_0 += self.stride;
-                i_1 += self.stride;
             }
+            i_0 += self.stride;
+            i_1 += self.stride;
         }
         return true;
     }
@@ -554,9 +555,16 @@ test "Image" {
                 .rgba = try RGBA.init(testing.allocator, Rectangle.init(0, 0, 10, 10)),
             };
         }
+
+        fn rgba64() !Image {
+            return Image{
+                .rgba64 = try RGBA64.init(testing.allocator, Rectangle.init(0, 0, 10, 10)),
+            };
+        }
     };
     const testImages = [_]initImage{
         .{ .init = initImage.rgba },
+        .{ .init = initImage.rgba64 },
     };
 
     for (testImages) |tc| {
@@ -564,7 +572,6 @@ test "Image" {
 
         const r = Rectangle.init(0, 0, 10, 10);
         testing.expect(r.eq(m.bounds()));
-
         testing.expect(cmp(m.colorModel(), color.Transparent, m.at(6, 3).?));
 
         m.set(6, 3, color.Opaque);
