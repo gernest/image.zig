@@ -90,9 +90,9 @@ pub const Model = struct {
                 const c = m.toValue();
                 if (c.a == 0xffff) {
                     const model = NRGBA{
-                        .r = @intCast(u8, c.r >> 8),
-                        .g = @intCast(u8, c.g >> 8),
-                        .b = @intCast(u8, c.b >> 8),
+                        .r = @truncate(u8, c.r >> 8),
+                        .g = @truncate(u8, c.g >> 8),
+                        .b = @truncate(u8, c.b >> 8),
                         .a = 0xff,
                     };
                     return Color{ .nrgba = model };
@@ -106,14 +106,14 @@ pub const Model = struct {
                     };
                     return Color{ .nrgba = model };
                 }
-                var r = (c.r * 0xffff) / c.a;
-                var g = (c.g * 0xffff) / c.a;
-                var b = (c.b * 0xffff) / c.a;
+                var r = mu(c.r, 0xffff) / c.a;
+                var g = mu(c.g, 0xffff) / c.a;
+                var b = mu(c.b, 0xffff) / c.a;
                 const model = NRGBA{
-                    .r = @intCast(u8, r >> 8),
-                    .g = @intCast(u8, g >> 8),
-                    .b = @intCast(u8, b >> 8),
-                    .a = @intCast(u8, c.rgb.a >> 8),
+                    .r = @truncate(u8, r >> 8),
+                    .g = @truncate(u8, g >> 8),
+                    .b = @truncate(u8, b >> 8),
+                    .a = @truncate(u8, c.a >> 8),
                 };
                 return Color{ .nrgba = model };
             },
@@ -127,9 +127,9 @@ pub const Model = struct {
                 const c = m.toValue();
                 if (c.a == 0xffff) {
                     const model = NRGBA64{
-                        .r = @intCast(u16, c.r),
-                        .g = @intCast(u16, c.g),
-                        .b = @intCast(u16, c.b),
+                        .r = @truncate(u16, c.r),
+                        .g = @truncate(u16, c.g),
+                        .b = @truncate(u16, c.b),
                         .a = 0xff,
                     };
                     return Color{ .nrgba64 = model };
@@ -143,18 +143,24 @@ pub const Model = struct {
                     };
                     return Color{ .nrgba64 = model };
                 }
-                var r = (c.r * 0xffff) / c.a;
-                var g = (c.g * 0xffff) / c.a;
-                var b = (c.b * 0xffff) / c.a;
+                var r = mu(c.r, 0xffff) / c.a;
+                var g = mu(c.g, 0xffff) / c.a;
+                var b = mu(c.b, 0xffff) / c.a;
                 const model = NRGBA64{
-                    .r = @intCast(u16, r),
-                    .g = @intCast(u16, g),
-                    .b = @intCast(u16, b),
-                    .a = @intCast(u16, c.a),
+                    .r = @truncate(u16, r),
+                    .g = @truncate(u16, g),
+                    .b = @truncate(u16, b),
+                    .a = @truncate(u16, c.a),
                 };
                 return Color{ .nrgba64 = model };
             },
         };
+    }
+
+    fn mu(a: u32, b: u32) u32 {
+        var r: u32 = undefined;
+        _ = @mulWithOverflow(u32, a, b, &r);
+        return r;
     }
 
     pub fn alphaModel(m: Color) Color {
@@ -355,13 +361,11 @@ pub const Alpha16 = struct {
     a: u16,
 
     fn toValue(c: Alpha16) Value {
-        var a: u32 = c.a;
-        a |= a << 8;
         return Value{
-            .r = a,
-            .g = a,
-            .b = a,
-            .a = a,
+            .r = c.a,
+            .g = c.a,
+            .b = c.a,
+            .a = c.a,
         };
     }
 };

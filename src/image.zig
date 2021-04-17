@@ -369,7 +369,7 @@ pub const NRGBA = struct {
 
     pub fn init(a: *std.mem.Allocator, r: Rectangle) !NRGBA {
         return NRGBA{
-            .pix = try a.alloc(u8, pixelBufferLength(4, r, "NRGBA")),
+            .pix = try createPix(a, 4, r, "NRGBA"),
             .stride = 4 * r.dx(),
             .rect = r,
         };
@@ -379,7 +379,7 @@ pub const NRGBA = struct {
         const point = Point{ .x = x, .y = y };
         if (!point.in(self.rect)) return null;
         const i = self.pixOffset(x, y);
-        const s = self.pix[i..4];
+        const s = self.pix[i .. i + 4];
         return Color{
             .nrgba = .{
                 .r = s[0],
@@ -394,12 +394,12 @@ pub const NRGBA = struct {
         const point = Point{ .x = x, .y = y };
         if (point.in(self.rect)) {
             const i = self.pixOffset(x, y);
-            const c1 = color.NRGBA64Model.convert(c).toValue();
-            var s = self.pix[i..4];
-            s[0] = @intCast(u8, c1.r);
-            s[1] = @intCast(u8, c1.g);
-            s[2] = @intCast(u8, c1.b);
-            s[3] = @intCast(u8, c1.a);
+            const c1 = color.NRGBAModel.convert(c).toValue();
+            var s = self.pix[i .. i + 4];
+            s[0] = @truncate(u8, c1.r);
+            s[1] = @truncate(u8, c1.g);
+            s[2] = @truncate(u8, c1.b);
+            s[3] = @truncate(u8, c1.a);
         }
     }
 
@@ -427,9 +427,9 @@ pub const NRGBA = struct {
                 if (self.pix[@intCast(usize, i)] != 0xff) {
                     return false;
                 }
-                i_0 += self.stride;
-                i_1 += self.stride;
             }
+            i_0 += self.stride;
+            i_1 += self.stride;
         }
         return true;
     }
@@ -488,6 +488,7 @@ pub const Alpha16 = struct {
         return false;
     }
 };
+
 pub const Gray = struct {
     pix: []u8,
     stride: isize,
@@ -561,10 +562,16 @@ test "Image" {
                 .rgba64 = try RGBA64.init(testing.allocator, Rectangle.init(0, 0, 10, 10)),
             };
         }
+        fn nrgba() !Image {
+            return Image{
+                .nrgba = try NRGBA.init(testing.allocator, Rectangle.init(0, 0, 10, 10)),
+            };
+        }
     };
     const testImages = [_]initImage{
         .{ .init = initImage.rgba },
         .{ .init = initImage.rgba64 },
+        .{ .init = initImage.nrgba },
     };
 
     for (testImages) |tc| {
