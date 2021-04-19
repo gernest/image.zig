@@ -444,15 +444,80 @@ pub const NRGBA64 = struct {
     stride: isize,
     rect: Rectangle,
 
+    pub fn init(a: *std.mem.Allocator, r: Rectangle) !NRGBA64 {
+        return NRGBA64{
+            .pix = try createPix(a, 8, r, "NRGBA64"),
+            .stride = 8 * r.dx(),
+            .rect = r,
+        };
+    }
+
     pub fn at(self: NRGBA64, x: isize, y: isize) ?Color {
-        return null;
+        const point = Point{ .x = x, .y = y };
+        if (!point.in(self.rect)) return null;
+        const i = self.pixOffset(x, y);
+        const s = self.pix[i .. i + 8];
+        return color.Color{
+            .nrgba64 = .{
+                .r = (@intCast(u16, s[0]) << 8) | @intCast(u16, s[1]),
+                .g = @intCast(u16, s[2]) << 8 | @intCast(u16, s[3]),
+                .b = @intCast(u16, s[4]) << 8 | @intCast(u16, s[5]),
+                .a = @intCast(u16, s[6]) << 8 | @intCast(u16, s[7]),
+            },
+        };
     }
-    pub fn set(self: NRGBA64, x: isize, y: isize, c: Color) void {}
+
+    pub fn pixOffset(self: NRGBA64, x: isize, y: isize) usize {
+        const v = (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 8;
+        return @intCast(usize, v);
+    }
+
+    pub fn set(self: NRGBA64, x: isize, y: isize, c: Color) void {
+        const point = Point{ .x = x, .y = y };
+        if (point.in(self.rect)) {
+            const i = self.pixOffset(x, y);
+            const c1 = color.NRGBA64Model.convert(c).toValue();
+            var s = self.pix[i .. i + 8];
+            s[0] = @truncate(u8, c1.r >> 8);
+            s[1] = @truncate(u8, c1.r);
+            s[2] = @truncate(u8, c1.g >> 8);
+            s[3] = @truncate(u8, c1.g);
+            s[4] = @truncate(u8, c1.b >> 8);
+            s[5] = @truncate(u8, c1.b);
+            s[6] = @truncate(u8, c1.a >> 8);
+            s[7] = @truncate(u8, c1.a);
+        }
+    }
+
     pub fn subImage(self: NRGBA64, r: Rectangle) ?Image {
-        return null;
+        const n = r.intersect(self.rect);
+        if (n.empty()) return null;
+        const i = self.pixOffset(r.min.x, r.min.y);
+        return Image{
+            .nrgba64 = NRGBA64{
+                .pix = self.pix[i..],
+                .stride = self.stride,
+                .rect = r,
+            },
+        };
     }
+
     pub fn @"opaque"(self: NRGBA64) bool {
-        return false;
+        if (self.rect.empty()) return true;
+        var i_0: isize = 6;
+        var i_1: isize = self.rect.dx() * 8;
+        var y = self.rect.min.y;
+        while (y < self.rect.max.y) : (y += 1) {
+            var i = i_0;
+            while (i < i_1) : (i += 8) {
+                if (self.pix[@intCast(usize, i) + 0] != 0xff or self.pix[@intCast(usize, i) + 1] != 0xff) {
+                    return false;
+                }
+            }
+            i_0 += self.stride;
+            i_1 += self.stride;
+        }
+        return true;
     }
 };
 
@@ -480,6 +545,7 @@ pub const Alpha16 = struct {
     pub fn at(self: Alpha16, x: isize, y: isize) ?Color {
         return null;
     }
+
     pub fn set(self: Alpha16, x: isize, y: isize, c: Color) void {}
     pub fn subImage(self: Alpha16, r: Rectangle) ?Image {
         return null;
@@ -567,11 +633,17 @@ test "Image" {
                 .nrgba = try NRGBA.init(testing.allocator, Rectangle.init(0, 0, 10, 10)),
             };
         }
+        fn nrgba64() !Image {
+            return Image{
+                .nrgba64 = try NRGBA64.init(testing.allocator, Rectangle.init(0, 0, 10, 10)),
+            };
+        }
     };
     const testImages = [_]initImage{
         .{ .init = initImage.rgba },
         .{ .init = initImage.rgba64 },
         .{ .init = initImage.nrgba },
+        .{ .init = initImage.nrgba64 },
     };
 
     for (testImages) |tc| {

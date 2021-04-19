@@ -1,4 +1,5 @@
 const testing = @import("std").testing;
+const print = @import("std").debug.print;
 
 /// Color can convert itself to alpha-premultiplied 16-bits per channel RGBA.
 /// The conversion may be lossy.
@@ -130,7 +131,7 @@ pub const Model = struct {
                         .r = @truncate(u16, c.r),
                         .g = @truncate(u16, c.g),
                         .b = @truncate(u16, c.b),
-                        .a = 0xff,
+                        .a = 0xffff,
                     };
                     return Color{ .nrgba64 = model };
                 }
@@ -319,18 +320,15 @@ pub const NRGBA64 = struct {
     a: u16,
 
     fn toValue(c: NRGBA64) Value {
-        var r: u32 = c.r;
-        var g: u32 = c.g;
-        var b: u32 = c.b;
-        var a: u32 = c.a;
-        r |= r << 8;
-        r *= a;
+        var r = @intCast(u32, c.r);
+        var g = @intCast(u32, c.g);
+        var b = @intCast(u32, c.b);
+        var a = @intCast(u32, c.a);
+        _ = @mulWithOverflow(u32, r, a, &r);
         r /= 0xffff;
-        g |= g << 8;
-        g *= a;
+        _ = @mulWithOverflow(u32, g, a, &g);
         g /= 0xffff;
-        b |= b << 8;
-        b *= a;
+        _ = @mulWithOverflow(u32, b, a, &b);
         b /= 0xffff;
         return Value{
             .r = r,
