@@ -594,16 +594,69 @@ pub const Alpha16 = struct {
     stride: isize,
     rect: Rectangle,
 
-    pub fn at(self: Alpha16, x: isize, y: isize) ?Color {
-        return null;
+    pub fn init(a: *std.mem.Allocator, r: Rectangle) !Alpha16 {
+        return Alpha16{
+            .pix = try createPix(a, 2, r, "Alpha16"),
+            .stride = 2 * r.dx(),
+            .rect = r,
+        };
     }
 
-    pub fn set(self: Alpha16, x: isize, y: isize, c: Color) void {}
-    pub fn subImage(self: Alpha16, r: Rectangle) ?Image {
-        return null;
+    pub fn at(self: Alpha16, x: isize, y: isize) ?Color {
+        const point = Point{ .x = x, .y = y };
+        if (!point.in(self.rect)) return null;
+        const i = self.pixOffset(x, y);
+        return color.Color{
+            .alpha16 = color.Alpha16{
+                .a = @intCast(u16, self.pix[i]) << 8 | @intCast(u16, self.pix[i + 1]),
+            },
+        };
     }
+
+    pub fn pixOffset(self: Alpha16, x: isize, y: isize) usize {
+        const v = (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 2;
+        return @intCast(usize, v);
+    }
+
+    pub fn set(self: Alpha16, x: isize, y: isize, c: Color) void {
+        const point = Point{ .x = x, .y = y };
+        if (point.in(self.rect)) {
+            const i = self.pixOffset(x, y);
+            const c1 = color.Alpha16Model.convert(c).alpha16;
+            self.pix[i + 0] = @truncate(u8, c1.a >> 8);
+            self.pix[i + 1] = @truncate(u8, c1.a);
+        }
+    }
+
+    pub fn subImage(self: Alpha16, r: Rectangle) ?Image {
+        const n = r.intersect(self.rect);
+        if (n.empty()) return null;
+        const i = self.pixOffset(r.min.x, r.min.y);
+        return Image{
+            .alpha16 = Alpha16{
+                .pix = self.pix[i..],
+                .stride = self.stride,
+                .rect = r,
+            },
+        };
+    }
+
     pub fn @"opaque"(self: Alpha16) bool {
-        return false;
+        if (self.rect.empty()) return true;
+        var i_0: isize = 0;
+        var i_1: isize = self.rect.dx() * 2;
+        var y = self.rect.min.y;
+        while (y < self.rect.max.y) : (y += 1) {
+            var i = i_0;
+            while (i < i_1) : (i += 8) {
+                if (self.pix[@intCast(usize, i) + 0] != 0xff or self.pix[@intCast(usize, i) + 1] != 0xff) {
+                    return false;
+                }
+            }
+            i_0 += self.stride;
+            i_1 += self.stride;
+        }
+        return true;
     }
 };
 
@@ -697,13 +750,20 @@ test "Image" {
                 .alpha = try Alpha.init(testing.allocator, Rectangle.init(0, 0, 10, 10)),
             };
         }
+
+        fn alpha16() !Image {
+            return Image{
+                .alpha16 = try Alpha16.init(testing.allocator, Rectangle.init(0, 0, 10, 10)),
+            };
+        }
     };
     const testImages = [_]initImage{
-        .{ .init = initImage.rgba },
-        .{ .init = initImage.rgba64 },
-        .{ .init = initImage.nrgba },
-        .{ .init = initImage.nrgba64 },
-        .{ .init = initImage.alpha },
+        // .{ .init = initImage.rgba },
+        // .{ .init = initImage.rgba64 },
+        // .{ .init = initImage.nrgba },
+        // .{ .init = initImage.nrgba64 },
+        // .{ .init = initImage.alpha },
+        .{ .init = initImage.alpha16 },
     };
 
     for (testImages) |tc| {
