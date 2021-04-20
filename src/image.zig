@@ -758,11 +758,11 @@ test "Image" {
         }
     };
     const testImages = [_]initImage{
-        // .{ .init = initImage.rgba },
-        // .{ .init = initImage.rgba64 },
-        // .{ .init = initImage.nrgba },
-        // .{ .init = initImage.nrgba64 },
-        // .{ .init = initImage.alpha },
+        .{ .init = initImage.rgba },
+        .{ .init = initImage.rgba64 },
+        .{ .init = initImage.nrgba },
+        .{ .init = initImage.nrgba64 },
+        .{ .init = initImage.alpha },
         .{ .init = initImage.alpha16 },
     };
 
