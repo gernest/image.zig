@@ -526,17 +526,69 @@ pub const Alpha = struct {
     stride: isize,
     rect: Rectangle,
 
+    pub fn init(a: *std.mem.Allocator, r: Rectangle) !Alpha {
+        return Alpha{
+            .pix = try createPix(a, 1, r, "Alpha"),
+            .stride = 1 * r.dx(),
+            .rect = r,
+        };
+    }
+
     pub fn at(self: Alpha, x: isize, y: isize) ?Color {
-        return null;
+        const point = Point{ .x = x, .y = y };
+        if (!point.in(self.rect)) return null;
+        const i = self.pixOffset(x, y);
+        return color.Color{
+            .alpha = color.Alpha{
+                .a = self.pix[i],
+            },
+        };
     }
-    pub fn set(self: Alpha, x: isize, y: isize, c: Color) void {}
+
+    pub fn pixOffset(self: Alpha, x: isize, y: isize) usize {
+        const v = (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 1;
+        return @intCast(usize, v);
+    }
+    pub fn set(self: Alpha, x: isize, y: isize, c: Color) void {
+        const point = Point{ .x = x, .y = y };
+        if (point.in(self.rect)) {
+            const i = self.pixOffset(x, y);
+            self.pix[i] = color.AlphaModel.convert(c).alpha.a;
+        }
+    }
+
     pub fn subImage(self: Alpha, r: Rectangle) ?Image {
-        return null;
+        const n = r.intersect(self.rect);
+        if (n.empty()) return null;
+        const i = self.pixOffset(r.min.x, r.min.y);
+        return Image{
+            .alpha = Alpha{
+                .pix = self.pix[i..],
+                .stride = self.stride,
+                .rect = r,
+            },
+        };
     }
+
     pub fn @"opaque"(self: Alpha) bool {
-        return false;
+        if (self.rect.empty()) return true;
+        var i_0: isize = 0;
+        var i_1: isize = self.rect.dx() * 1;
+        var y = self.rect.min.y;
+        while (y < self.rect.max.y) : (y += 1) {
+            var i = i_0;
+            while (i < i_1) : (i += 8) {
+                if (self.pix[@intCast(usize, i)] != 0xff) {
+                    return false;
+                }
+            }
+            i_0 += self.stride;
+            i_1 += self.stride;
+        }
+        return true;
     }
 };
+
 pub const Alpha16 = struct {
     pix: []u8,
     stride: isize,
@@ -571,6 +623,7 @@ pub const Gray = struct {
         return false;
     }
 };
+
 pub const Gray16 = struct {
     pix: []u8,
     stride: isize,
@@ -638,12 +691,19 @@ test "Image" {
                 .nrgba64 = try NRGBA64.init(testing.allocator, Rectangle.init(0, 0, 10, 10)),
             };
         }
+
+        fn alpha() !Image {
+            return Image{
+                .alpha = try Alpha.init(testing.allocator, Rectangle.init(0, 0, 10, 10)),
+            };
+        }
     };
     const testImages = [_]initImage{
         .{ .init = initImage.rgba },
         .{ .init = initImage.rgba64 },
         .{ .init = initImage.nrgba },
         .{ .init = initImage.nrgba64 },
+        .{ .init = initImage.alpha },
     };
 
     for (testImages) |tc| {
