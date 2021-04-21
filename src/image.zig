@@ -549,6 +549,7 @@ pub const Alpha = struct {
         const v = (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 1;
         return @intCast(usize, v);
     }
+
     pub fn set(self: Alpha, x: isize, y: isize, c: Color) void {
         const point = Point{ .x = x, .y = y };
         if (point.in(self.rect)) {
@@ -665,15 +666,52 @@ pub const Gray = struct {
     stride: isize,
     rect: Rectangle,
 
-    pub fn at(self: Gray, x: isize, y: isize) ?Color {
-        return null;
+    pub fn init(a: *std.mem.Allocator, r: Rectangle) !Gray {
+        return Gray{
+            .pix = try createPix(a, 1, r, "Gray"),
+            .stride = 1 * r.dx(),
+            .rect = r,
+        };
     }
-    pub fn set(self: Gray, x: isize, y: isize, c: Color) void {}
+
+    pub fn at(self: Gray, x: isize, y: isize) ?Color {
+        const point = Point{ .x = x, .y = y };
+        if (!point.in(self.rect)) return null;
+        const i = self.pixOffset(x, y);
+        return color.Color{
+            .gray = color.Gray{
+                .y = self.pix[i],
+            },
+        };
+    }
+
+    pub fn pixOffset(self: Gray, x: isize, y: isize) usize {
+        const v = (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 1;
+        return @intCast(usize, v);
+    }
+
+    pub fn set(self: Gray, x: isize, y: isize, c: Color) void {
+        const point = Point{ .x = x, .y = y };
+        if (point.in(self.rect)) {
+            const i = self.pixOffset(x, y);
+            self.pix[i] = color.GrayModel.convert(c).gray.y;
+        }
+    }
+
     pub fn subImage(self: Gray, r: Rectangle) ?Image {
-        return null;
+        const n = r.intersect(self.rect);
+        if (n.empty()) return null;
+        const i = self.pixOffset(r.min.x, r.min.y);
+        return Image{
+            .gray = Gray{
+                .pix = self.pix[i..],
+                .stride = self.stride,
+                .rect = r,
+            },
+        };
     }
     pub fn @"opaque"(self: Gray) bool {
-        return false;
+        return true;
     }
 };
 
@@ -682,15 +720,53 @@ pub const Gray16 = struct {
     stride: isize,
     rect: Rectangle,
 
+    pub fn init(a: *std.mem.Allocator, r: Rectangle) !Gray16 {
+        return Gray16{
+            .pix = try createPix(a, 2, r, "Gray16"),
+            .stride = 2 * r.dx(),
+            .rect = r,
+        };
+    }
     pub fn at(self: Gray16, x: isize, y: isize) ?Color {
-        return null;
+        const point = Point{ .x = x, .y = y };
+        if (!point.in(self.rect)) return null;
+        const i = self.pixOffset(x, y);
+        return color.Color{
+            .gray16 = color.Gray16{
+                .y = @intCast(u16, self.pix[i]) << 8 | @intCast(u16, self.pix[i + 1]),
+            },
+        };
     }
-    pub fn set(self: Gray16, x: isize, y: isize, c: Color) void {}
+
+    pub fn pixOffset(self: Gray16, x: isize, y: isize) usize {
+        const v = (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 2;
+        return @intCast(usize, v);
+    }
+    pub fn set(self: Gray16, x: isize, y: isize, c: Color) void {
+        const point = Point{ .x = x, .y = y };
+        if (point.in(self.rect)) {
+            const i = self.pixOffset(x, y);
+            const c1 = color.Gray16Model.convert(c).gray16;
+            self.pix[i + 0] = @truncate(u8, c1.y >> 8);
+            self.pix[i + 1] = @truncate(u8, c1.y);
+        }
+    }
+
     pub fn subImage(self: Gray16, r: Rectangle) ?Image {
-        return null;
+        const n = r.intersect(self.rect);
+        if (n.empty()) return null;
+        const i = self.pixOffset(r.min.x, r.min.y);
+        return Image{
+            .gray16 = Gray16{
+                .pix = self.pix[i..],
+                .stride = self.stride,
+                .rect = r,
+            },
+        };
     }
+
     pub fn @"opaque"(self: Gray16) bool {
-        return false;
+        return true;
     }
 };
 
@@ -756,6 +832,16 @@ test "Image" {
                 .alpha16 = try Alpha16.init(testing.allocator, Rectangle.init(0, 0, 10, 10)),
             };
         }
+        fn gray() !Image {
+            return Image{
+                .gray = try Gray.init(testing.allocator, Rectangle.init(0, 0, 10, 10)),
+            };
+        }
+        fn gray16() !Image {
+            return Image{
+                .gray16 = try Gray16.init(testing.allocator, Rectangle.init(0, 0, 10, 10)),
+            };
+        }
     };
     const testImages = [_]initImage{
         .{ .init = initImage.rgba },
@@ -764,6 +850,8 @@ test "Image" {
         .{ .init = initImage.nrgba64 },
         .{ .init = initImage.alpha },
         .{ .init = initImage.alpha16 },
+        .{ .init = initImage.gray },
+        .{ .init = initImage.gray16 },
     };
 
     for (testImages) |tc| {
