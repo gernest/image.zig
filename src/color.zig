@@ -688,3 +688,35 @@ const YCbCr = struct {
         };
     }
 };
+
+const Palette = struct {
+    colors: []Color,
+
+    pub fn convert(self: Palette, c: Color) ?Color {
+        if (self.colors.len == 0) {
+            return null;
+        }
+        return self.colors[self.index(c)];
+    }
+
+    pub fn index(self: Palette, c: Color) usize {
+        const value = c.toValue();
+        var ret: u32 = 0;
+        var best_sum: u32 = (1 << 32) - 1;
+        for (self.colors) |v, i| {
+            const value2 = v.toValue();
+            const sum = sqDiff(value.r, value2.r) +
+                sqDiff(value.g, value2.g) +
+                sqDiff(value.b, value2.b) +
+                sqDiff(value.a, value2.a);
+            if (sum < best_sum) {
+                if (sum == 0) {
+                    return i;
+                }
+                ret = i;
+                best_sum = sum;
+            }
+        }
+        return ret;
+    }
+};
