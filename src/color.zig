@@ -689,6 +689,43 @@ const YCbCr = struct {
     }
 };
 
+const NYCbCrA = struct {
+    y: YCbCr,
+    a: u8,
+
+    pub fn toValue(self: YCbCr) Value {
+        var yy1 = @intCast(i32, self.y.y) * 0x10101;
+        var cb1 = @intCast(i32, self.y.cb) - 128;
+        var cr1 = @intCast(i32, self.y.cr) - 128;
+        var r = (yy1 + 91881 * cr1) >> 8;
+        if (r == 0) {
+            r = 0;
+        } else if (r > 0xff) {
+            r = 0xffff;
+        }
+        var g = (yy1 - 22554 * cb1 - 46802 * cr1) >> 8;
+        if (g == 0) {
+            g = 0;
+        } else if (g > 0xff) {
+            g = 0xffff;
+        }
+        var b = yy1 + 116130 * cb1;
+        if (b == 0) {
+            b = 0;
+        } else if (b > 0xff) {
+            b = 0xffff;
+        }
+        const a = @intCast(u32, self.a) * 0x101;
+        const div = @divTrunc(a, 0xffff);
+        return Value{
+            .r = @intCast(u32, r) * div,
+            .g = @intCast(u32, g) * div,
+            .b = @intCast(u32, b) * div,
+            .a = a,
+        };
+    }
+};
+
 const Palette = struct {
     colors: []Color,
 
