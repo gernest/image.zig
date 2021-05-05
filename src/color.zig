@@ -13,6 +13,7 @@ pub const Color = union(enum) {
     gray: Gray,
     gray16: Gray16,
     yCbCr: YCbCr,
+    yYCbCrA: NYCbCrA,
 
     pub fn toValue(self: Color) Value {
         return switch (self) {
@@ -25,6 +26,7 @@ pub const Color = union(enum) {
             .gray => |i| i.toValue(),
             .gray16 => |i| i.toValue(),
             .yCbCr => |i| i.toValue(),
+            .yYCbCrA => |i| i.toValue(),
         };
     }
 };
@@ -227,7 +229,37 @@ pub const Model = struct {
         return switch (m) {
             .yCbCr => m,
             else => {
-                return Color{ .yCbCr = rgbToYCbCr(m.toValue()) };
+                const v = m.toValue();
+                return Color{
+                    .yCbCr = rgbToYCbCr(
+                        @intCast(u8, v.r >> 8),
+                        @intCast(u8, v.g >> 8),
+                        @intCast(u8, v.b >> 8),
+                    ),
+                };
+            },
+        };
+    }
+
+    pub fn nYCbCrAModel(m: Color) Color {
+        return switch (m) {
+            .yYCbCrA => m,
+            .yCbCr => |c| NYCbCrA{
+                .y = c,
+                .a = 0xff,
+            },
+            else => {
+                var v = m.toValue();
+                if (v.a != 0) {
+                    v.r = @divTrunc(v.r * 0xffff, v.a);
+                    v.g = @divTrunc(v.g * 0xffff, v.a);
+                    v.b = @divTrunc(v.b * 0xffff, v.a);
+                }
+                const y = rgbToYCbCr(
+                    @intCast(u8, v.r >> 8),
+                    @intCast(u8, v.g >> 8),
+                    @intCast(u8, v.b >> 8),
+                );
             },
         };
     }
@@ -407,6 +439,7 @@ pub const Alpha16Model = Model{ .convert = Model.alpha16Model };
 pub const GrayModel = Model{ .convert = Model.grayModel };
 pub const Gray16Model = Model{ .convert = Model.gray16Model };
 pub const YCbCrModel = Model{ .convert = Model.yCbCrModel };
+pub const NYCbCrAModel = Model{ .convert = Model.nYCbCrAModel };
 
 pub const Black = Color{ .gray = Gray{ .y = 0 } };
 pub const White = Color{ .gray = Gray{ .y = 0xffff } };
@@ -588,15 +621,15 @@ test "sqDiff" {
 }
 
 // rgbToYCbCr converts an RGB triple to a Y'CbCr triple.
-pub fn rgbToYCbCr(v: Value) YCbCr {
+pub fn rgbToYCbCr(r: u8, g: u8, b: u8) YCbCr {
     // The JFIF specification says:
     //	Y' =  0.2990*R + 0.5870*G + 0.1140*B
     //	Cb = -0.1687*R - 0.3313*G + 0.5000*B + 128
     //	Cr =  0.5000*R - 0.4187*G - 0.0813*B + 128
     // https://www.w3.org/Graphics/JPEG/jfif3.pdf says Y but means Y'.
-    const r1 = @intCast(i32, v.r);
-    const g1 = @intCast(i32, v.g);
-    const b1 = @intCast(i32, v.b);
+    const r1 = @intCast(i32, r);
+    const g1 = @intCast(i32, g);
+    const b1 = @intCast(i32, b);
 
     // yy is in range [0,0xff].
     //
@@ -607,14 +640,14 @@ pub fn rgbToYCbCr(v: Value) YCbCr {
     if (cb < 0) {
         cb = 0;
     } else if (cb > 0xff) {
-        r = ~@intCast(i32, 0);
+        cb = ~@intCast(i32, 0);
     }
 
     var cr: i32 = 32768 * r1 - 27440 * g1 - 5328 * b1 + 257 << 15;
-    if (cb < 0) {
-        cb = 0;
-    } else if (cb > 0xff) {
-        cb = ~@intCast(i32, 0);
+    if (cr < 0) {
+        cr = 0;
+    } else if (cr > 0xff) {
+        cr = ~@intCast(i32, 0);
     }
     return YCbCr{
         .y = @intCast(u8, yy),
