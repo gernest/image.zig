@@ -13,7 +13,7 @@ pub const Color = union(enum) {
     gray: Gray,
     gray16: Gray16,
     yCbCr: YCbCr,
-    yYCbCrA: NYCbCrA,
+    nYCbCrA: NYCbCrA,
 
     pub fn toValue(self: Color) Value {
         return switch (self) {
@@ -26,7 +26,7 @@ pub const Color = union(enum) {
             .gray => |i| i.toValue(),
             .gray16 => |i| i.toValue(),
             .yCbCr => |i| i.toValue(),
-            .yYCbCrA => |i| i.toValue(),
+            .nYCbCrA => |i| i.toValue(),
         };
     }
 };
@@ -621,41 +621,92 @@ test "sqDiff" {
 }
 
 // rgbToYCbCr converts an RGB triple to a Y'CbCr triple.
-pub fn rgbToYCbCr(r: u8, g: u8, b: u8) YCbCr {
-    // The JFIF specification says:
-    //	Y' =  0.2990*R + 0.5870*G + 0.1140*B
-    //	Cb = -0.1687*R - 0.3313*G + 0.5000*B + 128
-    //	Cr =  0.5000*R - 0.4187*G - 0.0813*B + 128
-    // https://www.w3.org/Graphics/JPEG/jfif3.pdf says Y but means Y'.
-    const r1 = @intCast(i32, r);
-    const g1 = @intCast(i32, g);
-    const b1 = @intCast(i32, b);
+pub fn rgbToYCbCr(c: RGB) YCbCr {
+    const r1 = @intCast(i32, c.r);
+    const g1 = @intCast(i32, c.g);
+    const b1 = @intCast(i32, c.b);
+    const yy = (19595 * r1 + 38470 * g1 + 7471 * b1 + (1 << 15)) >> 16;
 
-    // yy is in range [0,0xff].
-    //
-    // Note that 19595 + 38470 + 7471 equals 65536.
-    const yy = (19595 * r1 + 38470 * g1 + 7471 * b1 + 1 << 15) >> 16;
-
-    var cb: i32 = (-11056 * r1 - 21712 * g1 + 32768 * b1 + 257 << 15) >> 16;
+    var cb: i32 = (-11056 * r1 - 21712 * g1 + 32768 * b1 + (257 << 15)) >> 16;
     if (cb < 0) {
         cb = 0;
     } else if (cb > 0xff) {
-        cb = ~@intCast(i32, 0);
+        cb = 255;
     }
 
-    var cr: i32 = 32768 * r1 - 27440 * g1 - 5328 * b1 + 257 << 15;
+    var cr: i32 = (32768 * r1 - 27440 * g1 - 5328 * b1 + (257 << 15)) >> 16;
     if (cr < 0) {
         cr = 0;
     } else if (cr > 0xff) {
-        cr = ~@intCast(i32, 0);
+        cr = 255;
     }
     return YCbCr{
-        .y = @intCast(u8, yy),
-        .cr = @intCast(u8, cr),
-        .cb = @intCast(u8, cb),
+        .y = @truncate(u8, @intCast(u32, yy)),
+        .cr = @truncate(u8, @intCast(u32, cr)),
+        .cb = @truncate(u8, @intCast(u32, cb)),
     };
 }
 
+pub const RGB = struct {
+    r: u8,
+    g: u8,
+    b: u8,
+};
+
+pub fn yCbCrToRGB(c: YCbCr) RGB {
+    const yy1 = @intCast(i32, c.y) * 0x10101;
+    const cb1 = @intCast(i32, c.cb) - 128;
+    const cr1 = @intCast(i32, c.cr) - 128;
+    var r: i32 = (yy1 + 91881 * cr1) >> 16;
+    if (r < 0) {
+        r = 0;
+    } else if (r > 0xff) {
+        r = 255;
+    }
+    var g = (yy1 - 22554 * cb1 - 46802 * cr1) >> 16;
+    if (g < 0) {
+        g = 0;
+    } else if (g > 0xff) {
+        g = 255;
+    }
+    var b = (yy1 + 116130 * cb1) >> 16;
+    if (b < 0) {
+        b = 0;
+    } else if (b > 0xff) {
+        b = 255;
+    }
+    return RGB{
+        .r = @intCast(u8, r),
+        .g = @intCast(u8, g),
+        .b = @intCast(u8, b),
+    };
+}
+
+test "TestYCbCrRoundtrip" {
+    var r: usize = 0;
+    while (r < 256) : (r += 7) {
+        var g: usize = 0;
+        while (g < 256) : (g += 5) {
+            var b: usize = 0;
+            while (b < 256) : (b += 3) {
+                const o = RGB{
+                    .r = @truncate(u8, r),
+                    .g = @truncate(u8, g),
+                    .b = @truncate(u8, b),
+                };
+                const v0 = rgbToYCbCr(o);
+                const v1 = yCbCrToRGB(v0);
+                if (ytest.delta(o.r, v1.r) > 2 or
+                    ytest.delta(o.g, v1.g) > 2 or
+                    ytest.delta(o.b, v1.b) > 2)
+                {
+                    print("{any} {any} {any}", .{ v0, o, v1 });
+                    testing.expectEqual(o, v1);
+                }
+            }
+        }
+    }
+}
 // YCbCr represents a fully opaque 24-bit Y'CbCr color, having 8 bits each for
 // one luma and two chroma components.
 //
@@ -726,7 +777,7 @@ const NYCbCrA = struct {
     y: YCbCr,
     a: u8,
 
-    pub fn toValue(self: YCbCr) Value {
+    pub fn toValue(self: NYCbCrA) Value {
         var yy1 = @intCast(i32, self.y.y) * 0x10101;
         var cb1 = @intCast(i32, self.y.cb) - 128;
         var cr1 = @intCast(i32, self.y.cr) - 128;
@@ -788,5 +839,18 @@ const Palette = struct {
             }
         }
         return ret;
+    }
+};
+
+const ytest = struct {
+    fn delta(x: u8, y: u8) u8 {
+        if (x >= y) {
+            return x - y;
+        }
+        return y - x;
+    }
+
+    fn eq(c0: Color, c1: Color) void {
+        testing.expectEqual(c1.toValue(), co.toValue());
     }
 };
