@@ -620,30 +620,25 @@ test "sqDiff" {
     }
 }
 
+fn short01(v: i32) i32 {
+    if (@bitCast(u32, v) & 0xff000000 == 0) {
+        return v >> 16;
+    }
+    return ~(v >> 31);
+}
+
 // rgbToYCbCr converts an RGB triple to a Y'CbCr triple.
 pub fn rgbToYCbCr(c: RGB) YCbCr {
     const r1 = @intCast(i32, c.r);
     const g1 = @intCast(i32, c.g);
     const b1 = @intCast(i32, c.b);
     const yy = (19595 * r1 + 38470 * g1 + 7471 * b1 + (1 << 15)) >> 16;
-
-    var cb: i32 = (-11056 * r1 - 21712 * g1 + 32768 * b1 + (257 << 15)) >> 16;
-    if (cb < 0) {
-        cb = 0;
-    } else if (cb > 0xff) {
-        cb = 255;
-    }
-
-    var cr: i32 = (32768 * r1 - 27440 * g1 - 5328 * b1 + (257 << 15)) >> 16;
-    if (cr < 0) {
-        cr = 0;
-    } else if (cr > 0xff) {
-        cr = 255;
-    }
+    const cb = short01(-11056 * r1 - 21712 * g1 + 32768 * b1 + (257 << 15));
+    const cr = short01(32768 * r1 - 27440 * g1 - 5328 * b1 + (257 << 15));
     return YCbCr{
-        .y = @truncate(u8, @intCast(u32, yy)),
-        .cr = @truncate(u8, @intCast(u32, cr)),
-        .cb = @truncate(u8, @intCast(u32, cb)),
+        .y = @truncate(u8, @bitCast(u32, yy)),
+        .cr = @truncate(u8, @bitCast(u32, cr)),
+        .cb = @truncate(u8, @bitCast(u32, cb)),
     };
 }
 
