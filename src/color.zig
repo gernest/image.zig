@@ -707,6 +707,37 @@ test "TestYCbCrRoundtrip" {
         }
     }
 }
+
+test "TestYCbCrToRGBConsistency" {
+    // TestYCbCrToRGBConsistency tests that calling the RGBA method (16 bit color)
+    // then truncating to 8 bits is equivalent to calling the YCbCrToRGB function (8
+    // bit color).
+
+    var y: usize = 0;
+    while (y < 256) : (y += 7) {
+        var cb: usize = 0;
+        while (cb < 256) : (cb += 5) {
+            var cr: usize = 0;
+            while (cr < 256) : (cr += 3) {
+                const o = YCbCr{
+                    .y = @truncate(u8, y),
+                    .cb = @truncate(u8, cb),
+                    .cr = @truncate(u8, cr),
+                };
+                const v0 = o.toValue();
+                const v1 = RGB{
+                    .r = @truncate(u8, v0.r >> 8),
+                    .g = @truncate(u8, v0.g >> 8),
+                    .b = @truncate(u8, v0.b >> 8),
+                };
+                const v2 = yCbCrToRGB(o);
+                // print("{any} {any} {any}", .{ v0, v1, v2 });
+                testing.expectEqual(v1, v2);
+            }
+        }
+    }
+}
+
 // YCbCr represents a fully opaque 24-bit Y'CbCr color, having 8 bits each for
 // one luma and two chroma components.
 //
@@ -724,52 +755,26 @@ const YCbCr = struct {
     cr: u8,
 
     pub fn toValue(self: YCbCr) Value {
-        // This code is a copy of the YCbCrToRGB function above, except that it
-        // returns values in the range [0, 0xffff] instead of [0, 0xff]. There is a
-        // subtle difference between doing this and having YCbCr satisfy the Color
-        // interface by first converting to an RGBA. The latter loses some
-        // information by going to and from 8 bits per channel.
-        //
-        // For example, this code:
-        //	const y, cb, cr = 0x7f, 0x7f, 0x7f
-        //	r, g, b := color.YCbCrToRGB(y, cb, cr)
-        //	r0, g0, b0, _ := color.YCbCr{y, cb, cr}.RGBA()
-        //	r1, g1, b1, _ := color.RGBA{r, g, b, 0xff}.RGBA()
-        //	fmt.Printf("0x%04x 0x%04x 0x%04x\n", r0, g0, b0)
-        //	fmt.Printf("0x%04x 0x%04x 0x%04x\n", r1, g1, b1)
-        // prints:
-        //	0x7e18 0x808d 0x7db9
-        //	0x7e7e 0x8080 0x7d7d
         const yy1 = @intCast(i32, self.y) * 0x10101;
         const cb1 = @intCast(i32, self.cb) - 128;
         const cr1 = @intCast(i32, self.cr) - 128;
 
-        var r = (yy1 + 91881 * cr1) >> 8;
-        if (r < 0) {
-            r = 0;
-        } else if (r > 0xff) {
-            r = 0xffff;
-        }
-
-        var g = (yy1 - 22554 * cb1 - 46802 * cr1) >> 8;
-        if (g < 0) {
-            g = 0;
-        } else if (g > 0xff) {
-            g = 0xffff;
-        }
-
-        var b = (yy1 + 116130 * cb1) >> 8;
-        if (b < 0) {
-            b = 0;
-        } else if (b > 0xff) {
-            b = 0xffff;
-        }
+        const r = short(yy1 + 91881 * cr1);
+        const g = short(yy1 - 22554 * cb1 - 46802 * cr1);
+        const b = short(yy1 + 116130 * cb1);
         return Value{
             .r = @intCast(u32, r),
             .g = @intCast(u32, g),
             .b = @intCast(u32, b),
             .a = 0xffff,
         };
+    }
+
+    fn short(v: i32) i32 {
+        if (@bitCast(u32, v) & 0xff000000 == 0) {
+            return v >> 8;
+        }
+        return ~(v >> 31) & 0xffff;
     }
 };
 
