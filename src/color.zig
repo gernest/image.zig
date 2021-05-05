@@ -648,32 +648,26 @@ pub const RGB = struct {
     b: u8,
 };
 
+fn short02(v: i32) i32 {
+    if (@bitCast(u32, v) & 0xff000000 == 0) {
+        return v >> 16;
+    }
+    return ~(v >> 31) & 0xffff;
+}
+
 pub fn yCbCrToRGB(c: YCbCr) RGB {
     const yy1 = @intCast(i32, c.y) * 0x10101;
     const cb1 = @intCast(i32, c.cb) - 128;
     const cr1 = @intCast(i32, c.cr) - 128;
-    var r: i32 = (yy1 + 91881 * cr1) >> 16;
-    if (r < 0) {
-        r = 0;
-    } else if (r > 0xff) {
-        r = 255;
-    }
-    var g = (yy1 - 22554 * cb1 - 46802 * cr1) >> 16;
-    if (g < 0) {
-        g = 0;
-    } else if (g > 0xff) {
-        g = 255;
-    }
-    var b = (yy1 + 116130 * cb1) >> 16;
-    if (b < 0) {
-        b = 0;
-    } else if (b > 0xff) {
-        b = 255;
-    }
+
+    const r = short02(yy1 + 91881 * cr1);
+    const g = short02(yy1 - 22554 * cb1 - 46802 * cr1);
+    const b = short02(yy1 + 116130 * cb1);
+
     return RGB{
-        .r = @intCast(u8, r),
-        .g = @intCast(u8, g),
-        .b = @intCast(u8, b),
+        .r = @truncate(u8, @bitCast(u32, r)),
+        .g = @truncate(u8, @bitCast(u32, g)),
+        .b = @truncate(u8, @bitCast(u32, b)),
     };
 }
 
