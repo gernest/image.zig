@@ -862,6 +862,81 @@ const NYCbCrA = struct {
 const Palette = struct {
     colors: []Color,
 
+    const WebSafe: Palette = comptime {
+        var colors: [6 * 6 * 6]Color = undefined;
+        var r: usize = 0;
+        while (r < 6) : (r += 1) {
+            var g: usize = 0;
+            while (g < 6) : (g += 1) {
+                var b: usize = 0;
+                while (b < 6) : (b += 1) {
+                    colors[36 * r + 6 * g + b] = Color{
+                        .rgba = RGBA{
+                            .r = @truncate(u8, 0x33 * r),
+                            .g = @truncate(u8, 0x33 * g),
+                            .b = @truncate(u8, 0x33 * b),
+                            .a = 0xff,
+                        },
+                    };
+                }
+            }
+        }
+        const p = Palette{ .colors = colors[0..] };
+        return p;
+    };
+
+    const Plan9: Palette = comptime {
+        var colors: [256]Color = undefined;
+        var r: usize = 0;
+        var i: usize = 0;
+        while (r != 4) : (r += 1) {
+            var v: usize = 0;
+            while (v != 4) : ({
+                v += 1;
+                i += 16;
+            }) {
+                var g: usize = 0;
+                var j: usize = v - r;
+                while (g != 4) : (g += 1) {
+                    var b: usize = 0;
+                    while (b != 4) : ({
+                        b += 1;
+                        j += 1;
+                    }) {
+                        var den = r;
+                        if (g > den) {
+                            den = g;
+                        }
+                        if (b > den) {
+                            den = b;
+                        }
+                        if (den == 0) {
+                            colors[i + (j & 0x0f)] = Color{
+                                .rgba = RGBA{
+                                    .r = 0x11 * v,
+                                    .g = 0x11 * v,
+                                    .b = 0x11 * v,
+                                    .a = 0xff,
+                                },
+                            };
+                        } else {
+                            colors[i + (j & 0x0f)] = Color{
+                                .rgba = RGBA{
+                                    .r = (r * num) / den,
+                                    .g = (g * num) / den,
+                                    .b = (b * num) / den,
+                                    .a = 0xff,
+                                },
+                            };
+                        }
+                    }
+                }
+            }
+        }
+        const p = Palette{ .colors = colors[0..] };
+        return p;
+    };
+
     pub fn convert(self: Palette, c: Color) ?Color {
         if (self.colors.len == 0) {
             return null;
