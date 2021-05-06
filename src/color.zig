@@ -777,6 +777,31 @@ test "TestNYCbCrAAlpha" {
     }
 }
 
+test "TestNYCbCrAYCbCr" {
+    // TestNYCbCrAYCbCr tests that NYCbCrA colors are a superset of YCbCr colors.
+    var i: usize = 0;
+    while (i < 256) : (i += 1) {
+        const c0 = Color{
+            .nYCbCrA = NYCbCrA{
+                .y = YCbCr{
+                    .y = @intCast(u8, i),
+                    .cb = 0x40,
+                    .cr = 0xc0,
+                },
+                .a = 0xff,
+            },
+        };
+        const c1 = Color{
+            .yCbCr = YCbCr{
+                .y = @intCast(u8, i),
+                .cb = 0x40,
+                .cr = 0xc0,
+            },
+        };
+        ytest.eq(c0, c1);
+    }
+}
+
 // YCbCr represents a fully opaque 24-bit Y'CbCr color, having 8 bits each for
 // one luma and two chroma components.
 //
