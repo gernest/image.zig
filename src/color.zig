@@ -627,6 +627,20 @@ fn short01(v: i32) i32 {
     return ~(v >> 31);
 }
 
+fn short02(v: i32) i32 {
+    if (@bitCast(u32, v) & 0xff000000 == 0) {
+        return v >> 16;
+    }
+    return ~(v >> 31) & 0xffff;
+}
+
+fn short8(v: i32) i32 {
+    if (@bitCast(u32, v) & 0xff000000 == 0) {
+        return v >> 8;
+    }
+    return ~(v >> 31) & 0xffff;
+}
+
 // rgbToYCbCr converts an RGB triple to a Y'CbCr triple.
 pub fn rgbToYCbCr(c: RGB) YCbCr {
     const r1 = @intCast(i32, c.r);
@@ -647,13 +661,6 @@ pub const RGB = struct {
     g: u8,
     b: u8,
 };
-
-fn short02(v: i32) i32 {
-    if (@bitCast(u32, v) & 0xff000000 == 0) {
-        return v >> 16;
-    }
-    return ~(v >> 31) & 0xffff;
-}
 
 pub fn yCbCrToRGB(c: YCbCr) RGB {
     const yy1 = @intCast(i32, c.y) * 0x10101;
@@ -748,22 +755,15 @@ const YCbCr = struct {
         const cb1 = @intCast(i32, self.cb) - 128;
         const cr1 = @intCast(i32, self.cr) - 128;
 
-        const r = short(yy1 + 91881 * cr1);
-        const g = short(yy1 - 22554 * cb1 - 46802 * cr1);
-        const b = short(yy1 + 116130 * cb1);
+        const r = short8(yy1 + 91881 * cr1);
+        const g = short8(yy1 - 22554 * cb1 - 46802 * cr1);
+        const b = short8(yy1 + 116130 * cb1);
         return Value{
             .r = @intCast(u32, r),
             .g = @intCast(u32, g),
             .b = @intCast(u32, b),
             .a = 0xffff,
         };
-    }
-
-    fn short(v: i32) i32 {
-        if (@bitCast(u32, v) & 0xff000000 == 0) {
-            return v >> 8;
-        }
-        return ~(v >> 31) & 0xffff;
     }
 };
 
@@ -775,24 +775,10 @@ const NYCbCrA = struct {
         var yy1 = @intCast(i32, self.y.y) * 0x10101;
         var cb1 = @intCast(i32, self.y.cb) - 128;
         var cr1 = @intCast(i32, self.y.cr) - 128;
-        var r = (yy1 + 91881 * cr1) >> 8;
-        if (r == 0) {
-            r = 0;
-        } else if (r > 0xff) {
-            r = 0xffff;
-        }
-        var g = (yy1 - 22554 * cb1 - 46802 * cr1) >> 8;
-        if (g == 0) {
-            g = 0;
-        } else if (g > 0xff) {
-            g = 0xffff;
-        }
-        var b = yy1 + 116130 * cb1;
-        if (b == 0) {
-            b = 0;
-        } else if (b > 0xff) {
-            b = 0xffff;
-        }
+
+        const r = short8(yy1 + 91881 * cr1);
+        const g = short8(yy1 - 22554 * cb1 - 46802 * cr1);
+        const b = short8(yy1 + 116130 * cb1);
         const a = @intCast(u32, self.a) * 0x101;
         const div = @divTrunc(a, 0xffff);
         return Value{
