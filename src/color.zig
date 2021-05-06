@@ -453,15 +453,10 @@ pub const Opaque = Color{ .alpha16 = Alpha16{ .a = 0xffff } };
 ///
 /// x and y are both assumed to be in the range [0, 0xffff].
 fn sqDiff(x: u32, y: u32) u32 {
-    var d: u32 = 0;
-    if (x > y) {
-        d = x - y;
-    } else {
-        d = y - x;
-    }
-    var m: u32 = undefined;
-    _ = @mulWithOverflow(u32, d, d, &m);
-    return m >> 2;
+    var d: u32 = undefined;
+    _ = @subWithOverflow(u32, y, x, &d);
+    _ = @mulWithOverflow(u32, d, d, &d);
+    return d >> 2;
 }
 
 test "sqDiff" {
