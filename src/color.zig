@@ -967,6 +967,8 @@ pub const CMYK = struct {
 };
 
 test "TestCMYKRoundtrip" {
+    // TestCMYKRoundtrip tests that a subset of RGB space can be converted to CMYK
+    // and back to within 1/256 tolerance.
     var r: usize = 0;
     while (r < 256) : (r += 7) {
         var g: usize = 0;
@@ -985,6 +987,38 @@ test "TestCMYKRoundtrip" {
                     ytest.delta(v0.g, v2.g) > 1)
                 {
                     testing.expectEqual(v0, v2);
+                }
+            }
+        }
+    }
+}
+
+test "TestCMYKToRGBConsistency" {
+    // TestCMYKToRGBConsistency tests that calling the RGBA method (16 bit color)
+    // then truncating to 8 bits is equivalent to calling the CMYKToRGB function (8
+    // bit color).
+    var c: usize = 0;
+    while (c < 256) : (c += 7) {
+        var m: usize = 0;
+        while (m < 256) : (m += 5) {
+            var y: usize = 0;
+            while (y < 256) : (y += 3) {
+                var k: usize = 0;
+                while (k < 256) : (k += 11) {
+                    const v0 = CMYK{
+                        .c = @intCast(u8, c),
+                        .m = @intCast(u8, m),
+                        .y = @intCast(u8, y),
+                        .k = @intCast(u8, k),
+                    };
+                    const v1 = v0.toValue();
+                    const v2 = RGB{
+                        .r = @truncate(u8, v1.r >> 8),
+                        .g = @truncate(u8, v1.g >> 8),
+                        .b = @truncate(u8, v1.b >> 8),
+                    };
+                    const v3 = cmykToRGB(v0);
+                    testing.expectEqual(v2, v3);
                 }
             }
         }
