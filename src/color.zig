@@ -871,7 +871,7 @@ const Palette = struct {
 
     pub fn index(self: Palette, c: Color) usize {
         const value = c.toValue();
-        var ret: u32 = 0;
+        var ret: usize = 0;
         var best_sum: u32 = (1 << 32) - 1;
         for (self.colors) |v, i| {
             const value2 = v.toValue();
@@ -1044,4 +1044,81 @@ test "TestCMYKGray" {
         };
         ytest.eq(v0, v1);
     }
+}
+
+test "TestPalette" {
+    var colors = [_]Color{
+        .{
+            .rgba = RGBA{
+                .r = 0xff,
+                .g = 0xff,
+                .b = 0xff,
+                .a = 0xff,
+            },
+        },
+        .{
+            .rgba = RGBA{
+                .r = 0x80,
+                .g = 0x00,
+                .b = 0x00,
+                .a = 0xff,
+            },
+        },
+        .{
+            .rgba = RGBA{
+                .r = 0x7f,
+                .g = 0x00,
+                .b = 0x00,
+                .a = 0x7f,
+            },
+        },
+        .{
+            .rgba = RGBA{
+                .r = 0x00,
+                .g = 0x00,
+                .b = 0x00,
+                .a = 0x7f,
+            },
+        },
+        .{
+            .rgba = RGBA{
+                .r = 0x00,
+                .g = 0x00,
+                .b = 0x00,
+                .a = 0x00,
+            },
+        },
+        .{
+            .rgba = RGBA{
+                .r = 0x40,
+                .g = 0x40,
+                .b = 0x40,
+                .a = 0x40,
+            },
+        },
+    };
+    const p = Palette{
+        .colors = colors[0..],
+    };
+    for (p.colors) |c, i| {
+        const j = p.index(c);
+        testing.expectEqual(i, j);
+    }
+    const got = p.convert(Color{
+        .rgba = RGBA{
+            .r = 0x80,
+            .g = 0x00,
+            .b = 0x00,
+            .a = 0x80,
+        },
+    });
+    const want = Color{
+        .rgba = RGBA{
+            .r = 0x7f,
+            .g = 0x00,
+            .b = 0x00,
+            .a = 0x7f,
+        },
+    };
+    ytest.eq(want, got.?);
 }
