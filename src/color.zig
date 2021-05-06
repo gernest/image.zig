@@ -734,6 +734,26 @@ test "TestYCbCrToRGBConsistency" {
     }
 }
 
+test "TestYCbCrGray" {
+    // TestYCbCrGray tests that YCbCr colors are a superset of Gray colors.
+    var i: usize = 0;
+    while (i < 256) : (i += 1) {
+        const c0 = Color{
+            .yCbCr = YCbCr{
+                .y = @intCast(u8, i),
+                .cb = 0x80,
+                .cr = 0x80,
+            },
+        };
+        const c1 = Color{
+            .gray = Gray{
+                .y = @intCast(u8, i),
+            },
+        };
+        ytest.eq(c0, c1);
+    }
+}
+
 // YCbCr represents a fully opaque 24-bit Y'CbCr color, having 8 bits each for
 // one luma and two chroma components.
 //
@@ -831,6 +851,6 @@ const ytest = struct {
     }
 
     fn eq(c0: Color, c1: Color) void {
-        testing.expectEqual(c1.toValue(), co.toValue());
+        testing.expectEqual(c0.toValue(), c1.toValue());
     }
 };
