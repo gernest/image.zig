@@ -14,6 +14,7 @@ pub const Color = union(enum) {
     gray16: Gray16,
     yCbCr: YCbCr,
     nYCbCrA: NYCbCrA,
+    cMYK: CMYK,
 
     pub fn toValue(self: Color) Value {
         return switch (self) {
@@ -27,6 +28,7 @@ pub const Color = union(enum) {
             .gray16 => |i| i.toValue(),
             .yCbCr => |i| i.toValue(),
             .nYCbCrA => |i| i.toValue(),
+            .cMYK => |i| i.toValue(),
         };
     }
 };
@@ -901,3 +903,90 @@ const ytest = struct {
         testing.expectEqual(c0.toValue(), c1.toValue());
     }
 };
+
+pub fn rgbToCMYK(a: RGB) CMYK {
+    const rr = @intCast(u32, a.r);
+    const gg = @intCast(u32, a.g);
+    const bb = @intCast(u32, a.b);
+    var w = rr;
+    if (w < gg) {
+        w = gg;
+    }
+    if (w < bb) {
+        w = bb;
+    }
+    if (w == 0) {
+        return CMYK{
+            .c = 0,
+            .m = 0,
+            .y = 0,
+            .k = 0xff,
+        };
+    }
+    const c = ((w - rr) * 0xff) / w;
+    const m = ((w - gg) * 0xff) / w;
+    const y = ((w - bb) * 0xff) / w;
+    return CMYK{
+        .c = @truncate(u8, c),
+        .m = @truncate(u8, m),
+        .y = @truncate(u8, y),
+        .k = @truncate(u8, 0xff - w),
+    };
+}
+
+pub fn cmykToRGB(a: CMYK) RGB {
+    const w = 0xffff - @intCast(u32, a.k) * 0x101;
+    const r = ((0xffff - @intCast(u32, a.c) * 0x101) * w) / 0xffff;
+    const g = ((0xffff - @intCast(u32, a.m) * 0x101) * w) / 0xffff;
+    const b = ((0xffff - @intCast(u32, a.y) * 0x101) * w) / 0xffff;
+    return RGB{
+        .r = @truncate(u8, r >> 8),
+        .g = @truncate(u8, g >> 8),
+        .b = @truncate(u8, b >> 8),
+    };
+}
+
+pub const CMYK = struct {
+    c: u8,
+    m: u8,
+    y: u8,
+    k: u8,
+
+    pub fn toValue(self: CMYK) Value {
+        const w = 0xffff - @intCast(u32, self.k) * 0x101;
+        const r = ((0xffff - @intCast(u32, self.c) * 0x101) * w) / 0xffff;
+        const g = ((0xffff - @intCast(u32, self.m) * 0x101) * w) / 0xffff;
+        const b = ((0xffff - @intCast(u32, self.y) * 0x101) * w) / 0xffff;
+        return Value{
+            .r = r,
+            .g = g,
+            .b = b,
+            .a = 0xffff,
+        };
+    }
+};
+
+test "TestCMYKRoundtrip" {
+    var r: usize = 0;
+    while (r < 256) : (r += 7) {
+        var g: usize = 0;
+        while (g < 256) : (g += 5) {
+            var b: usize = 0;
+            while (b < 256) : (b += 3) {
+                const v0 = RGB{
+                    .r = @intCast(u8, r),
+                    .g = @intCast(u8, g),
+                    .b = @intCast(u8, b),
+                };
+                const v1 = rgbToCMYK(v0);
+                const v2 = cmykToRGB(v1);
+                if (ytest.delta(v0.r, v2.r) > 1 or
+                    ytest.delta(v0.g, v2.g) > 1 or
+                    ytest.delta(v0.g, v2.g) > 1)
+                {
+                    testing.expectEqual(v0, v2);
+                }
+            }
+        }
+    }
+}
