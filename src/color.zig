@@ -754,6 +754,29 @@ test "TestYCbCrGray" {
     }
 }
 
+test "TestNYCbCrAAlpha" {
+    // TestNYCbCrAAlpha tests that NYCbCrA colors are a superset of Alpha colors.
+    var i: usize = 0;
+    while (i < 256) : (i += 1) {
+        const c0 = Color{
+            .nYCbCrA = NYCbCrA{
+                .y = YCbCr{
+                    .y = 0xff,
+                    .cb = 0x80,
+                    .cr = 0x80,
+                },
+                .a = @intCast(u8, i),
+            },
+        };
+        const c1 = Color{
+            .alpha = Alpha{
+                .a = @intCast(u8, i),
+            },
+        };
+        ytest.eq(c0, c1);
+    }
+}
+
 // YCbCr represents a fully opaque 24-bit Y'CbCr color, having 8 bits each for
 // one luma and two chroma components.
 //
@@ -800,11 +823,10 @@ const NYCbCrA = struct {
         const g = short8(yy1 - 22554 * cb1 - 46802 * cr1);
         const b = short8(yy1 + 116130 * cb1);
         const a = @intCast(u32, self.a) * 0x101;
-        const div = @divTrunc(a, 0xffff);
         return Value{
-            .r = @intCast(u32, r) * div,
-            .g = @intCast(u32, g) * div,
-            .b = @intCast(u32, b) * div,
+            .r = @divTrunc(@bitCast(u32, r) * a, 0xffff),
+            .g = @divTrunc(@bitCast(u32, g) * a, 0xffff),
+            .b = @divTrunc(@bitCast(u32, b) * a, 0xffff),
             .a = a,
         };
     }
