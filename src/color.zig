@@ -1024,3 +1024,24 @@ test "TestCMYKToRGBConsistency" {
         }
     }
 }
+
+test "TestCMYKGray" {
+    // TestCMYKGray tests that CMYK colors are a superset of Gray colors.
+    var i: usize = 0;
+    while (i < 256) : (i += 1) {
+        const v0 = Color{
+            .cMYK = CMYK{
+                .c = 0x00,
+                .m = 0x00,
+                .y = 0x00,
+                .k = @intCast(u8, 255 - i),
+            },
+        };
+        const v1 = Color{
+            .gray = Gray{
+                .y = @intCast(u8, i),
+            },
+        };
+        ytest.eq(v0, v1);
+    }
+}
