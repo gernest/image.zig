@@ -6,7 +6,6 @@ export fn add(a: i32, b: i32) i32 {
 }
 
 test "basic add functionality" {
-    _ = @import("color.zig");
     _ = @import("geom.zig");
     _ = @import("image.zig");
 }
