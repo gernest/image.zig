@@ -1,12 +1,11 @@
 const geom = @import("geom.zig");
-const color = @import("color.zig");
+const Color = @import("color.zig").Color;
 const std = @import("std");
 const testing = std.testing;
 const print = std.debug.print;
 
 const Rectangle = geom.Rectangle;
 const Point = geom.Point;
-const Color = color.Color;
 
 pub const Config = struct {
     model: color.Model,
@@ -24,16 +23,16 @@ pub const Image = union(enum) {
     gray: Gray,
     gray16: Gray16,
 
-    pub fn colorModel(self: Image) color.Model {
+    pub fn colorModel(self: Image) Color.Model {
         return switch (self) {
-            .rgba => color.RGBAModel,
-            .rgba64 => color.RGBA64Model,
-            .nrgba => color.RGBA64Model,
-            .nrgba64 => color.NRGBA64Model,
-            .alpha => color.AlphaModel,
-            .alpha16 => color.Alpha16Model,
-            .gray => color.GrayModel,
-            .gray16 => color.Gray16Model,
+            .rgba => Color.RGBAModel,
+            .rgba64 => Color.RGBA64Model,
+            .nrgba => Color.RGBA64Model,
+            .nrgba64 => Color.NRGBA64Model,
+            .alpha => Color.AlphaModel,
+            .alpha16 => Color.Alpha16Model,
+            .gray => Color.GrayModel,
+            .gray16 => Color.Gray16Model,
         };
     }
 
@@ -220,7 +219,7 @@ pub const RGBA = struct {
         const i = self.pixOffset(x, y);
         const s = self.pix[i .. i + 4];
         return Color{
-            .rgba = color.RGBA{
+            .rgba = .{
                 .r = s[0],
                 .g = s[1],
                 .b = s[2],
@@ -238,7 +237,7 @@ pub const RGBA = struct {
         const point = Point{ .x = x, .y = y };
         if (point.in(self.rect)) {
             const i = self.pixOffset(x, y);
-            const c1 = color.RGBAModel.convert(c).toValue();
+            const c1 = Color.RGBAModel.convert(c).toValue();
             const s = self.pix[i .. i + 4];
             s[0] = @truncate(u8, c1.r);
             s[1] = @truncate(u8, c1.g);
@@ -317,7 +316,7 @@ pub const RGBA64 = struct {
         const point = Point{ .x = x, .y = y };
         if (point.in(self.rect)) {
             const i = self.pixOffset(x, y);
-            const c1 = color.RGBA64Model.convert(c).toValue();
+            const c1 = Color.RGBA64Model.convert(c).toValue();
             var s = self.pix[i .. i + 8];
             s[0] = @truncate(u8, c1.r >> 8);
             s[1] = @truncate(u8, c1.r);
@@ -394,7 +393,7 @@ pub const NRGBA = struct {
         const point = Point{ .x = x, .y = y };
         if (point.in(self.rect)) {
             const i = self.pixOffset(x, y);
-            const c1 = color.NRGBAModel.convert(c).toValue();
+            const c1 = Color.NRGBAModel.convert(c).toValue();
             var s = self.pix[i .. i + 4];
             s[0] = @truncate(u8, c1.r);
             s[1] = @truncate(u8, c1.g);
@@ -457,7 +456,7 @@ pub const NRGBA64 = struct {
         if (!point.in(self.rect)) return null;
         const i = self.pixOffset(x, y);
         const s = self.pix[i .. i + 8];
-        return color.Color{
+        return Color{
             .nrgba64 = .{
                 .r = (@intCast(u16, s[0]) << 8) | @intCast(u16, s[1]),
                 .g = @intCast(u16, s[2]) << 8 | @intCast(u16, s[3]),
@@ -476,7 +475,7 @@ pub const NRGBA64 = struct {
         const point = Point{ .x = x, .y = y };
         if (point.in(self.rect)) {
             const i = self.pixOffset(x, y);
-            const c1 = color.NRGBA64Model.convert(c).toValue();
+            const c1 = Color.NRGBA64Model.convert(c).toValue();
             var s = self.pix[i .. i + 8];
             s[0] = @truncate(u8, c1.r >> 8);
             s[1] = @truncate(u8, c1.r);
@@ -538,8 +537,8 @@ pub const Alpha = struct {
         const point = Point{ .x = x, .y = y };
         if (!point.in(self.rect)) return null;
         const i = self.pixOffset(x, y);
-        return color.Color{
-            .alpha = color.Alpha{
+        return Color{
+            .alpha = .{
                 .a = self.pix[i],
             },
         };
@@ -554,7 +553,7 @@ pub const Alpha = struct {
         const point = Point{ .x = x, .y = y };
         if (point.in(self.rect)) {
             const i = self.pixOffset(x, y);
-            self.pix[i] = color.AlphaModel.convert(c).alpha.a;
+            self.pix[i] = Color.AlphaModel.convert(c).alpha.a;
         }
     }
 
@@ -607,8 +606,8 @@ pub const Alpha16 = struct {
         const point = Point{ .x = x, .y = y };
         if (!point.in(self.rect)) return null;
         const i = self.pixOffset(x, y);
-        return color.Color{
-            .alpha16 = color.Alpha16{
+        return Color{
+            .alpha16 = .{
                 .a = @intCast(u16, self.pix[i]) << 8 | @intCast(u16, self.pix[i + 1]),
             },
         };
@@ -623,7 +622,7 @@ pub const Alpha16 = struct {
         const point = Point{ .x = x, .y = y };
         if (point.in(self.rect)) {
             const i = self.pixOffset(x, y);
-            const c1 = color.Alpha16Model.convert(c).alpha16;
+            const c1 = Color.Alpha16Model.convert(c).alpha16;
             self.pix[i + 0] = @truncate(u8, c1.a >> 8);
             self.pix[i + 1] = @truncate(u8, c1.a);
         }
@@ -678,8 +677,8 @@ pub const Gray = struct {
         const point = Point{ .x = x, .y = y };
         if (!point.in(self.rect)) return null;
         const i = self.pixOffset(x, y);
-        return color.Color{
-            .gray = color.Gray{
+        return Color{
+            .gray = .{
                 .y = self.pix[i],
             },
         };
@@ -694,7 +693,7 @@ pub const Gray = struct {
         const point = Point{ .x = x, .y = y };
         if (point.in(self.rect)) {
             const i = self.pixOffset(x, y);
-            self.pix[i] = color.GrayModel.convert(c).gray.y;
+            self.pix[i] = Color.GrayModel.convert(c).gray.y;
         }
     }
 
@@ -731,8 +730,8 @@ pub const Gray16 = struct {
         const point = Point{ .x = x, .y = y };
         if (!point.in(self.rect)) return null;
         const i = self.pixOffset(x, y);
-        return color.Color{
-            .gray16 = color.Gray16{
+        return Color{
+            .gray16 = .{
                 .y = @intCast(u16, self.pix[i]) << 8 | @intCast(u16, self.pix[i + 1]),
             },
         };
@@ -746,7 +745,7 @@ pub const Gray16 = struct {
         const point = Point{ .x = x, .y = y };
         if (point.in(self.rect)) {
             const i = self.pixOffset(x, y);
-            const c1 = color.Gray16Model.convert(c).gray16;
+            const c1 = Color.Gray16Model.convert(c).gray16;
             self.pix[i + 0] = @truncate(u8, c1.y >> 8);
             self.pix[i + 1] = @truncate(u8, c1.y);
         }
@@ -784,7 +783,7 @@ pub const NYCbCrA = struct {
     rect: Rectangle,
 };
 
-fn cmp(cm: color.Model, c0: Color, c1: Color) bool {
+fn cmp(cm: Color.Model, c0: Color, c1: Color) bool {
     // std.debug.print("\nc0={any} c1={any}\n", .{ c0, c1 });
     const v0 = cm.convert(c0).toValue();
     const v1 = cm.convert(c1).toValue();
@@ -859,20 +858,20 @@ test "Image" {
 
         const r = Rectangle.init(0, 0, 10, 10);
         testing.expect(r.eq(m.bounds()));
-        testing.expect(cmp(m.colorModel(), color.Transparent, m.at(6, 3).?));
+        testing.expect(cmp(m.colorModel(), Color.Transparent, m.at(6, 3).?));
 
-        m.set(6, 3, color.Opaque);
-        testing.expect(cmp(m.colorModel(), color.Opaque, m.at(6, 3).?));
+        m.set(6, 3, Color.Opaque);
+        testing.expect(cmp(m.colorModel(), Color.Opaque, m.at(6, 3).?));
 
         testing.expect(m.subImage(Rectangle.rect(6, 3, 7, 4)).?.@"opaque"());
 
         const m2 = m.subImage(Rectangle.rect(3, 2, 9, 8)).?;
         testing.expect(Rectangle.rect(3, 2, 9, 8).eq(m2.bounds()));
 
-        testing.expect(cmp(m2.colorModel(), color.Opaque, m2.at(6, 3).?));
-        testing.expect(cmp(m2.colorModel(), color.Transparent, m2.at(3, 3).?));
-        m2.set(3, 3, color.Opaque);
-        testing.expect(cmp(m2.colorModel(), color.Opaque, m2.at(3, 3).?));
+        testing.expect(cmp(m2.colorModel(), Color.Opaque, m2.at(6, 3).?));
+        testing.expect(cmp(m2.colorModel(), Color.Transparent, m2.at(3, 3).?));
+        m2.set(3, 3, Color.Opaque);
+        testing.expect(cmp(m2.colorModel(), Color.Opaque, m2.at(3, 3).?));
 
         _ = m2.subImage(Rectangle.rect(0, 0, 0, 0));
         _ = m2.subImage(Rectangle.rect(10, 0, 10, 0));
