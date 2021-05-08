@@ -260,6 +260,20 @@ pub const Color = union(enum) {
                 },
             };
         }
+
+        pub fn cmykModel(c: Color) Color {
+            return switch (c) {
+                .cMYK => c,
+                else => {
+                    const v = c.toValue();
+                    return rgbToCMYK(RGB{
+                        .r = @truncate(u8, v.r >> 8),
+                        .g = @truncate(u8, v.g >> 8),
+                        .b = @truncate(u8, v.b >> 8),
+                    });
+                },
+            };
+        }
     };
 
     pub const RGBA = struct {
@@ -425,6 +439,7 @@ pub const Color = union(enum) {
     pub const Gray16Model = Model{ .convert = Model.gray16Model };
     pub const YCbCrModel = Model{ .convert = Model.yCbCrModel };
     pub const NYCbCrAModel = Model{ .convert = Model.nYCbCrAModel };
+    pub const CMYKModel = Model{ .convert = Model.cmykModel };
 
     pub const Black = Color{ .gray = Gray{ .y = 0 } };
     pub const White = Color{ .gray = Gray{ .y = 0xffff } };
@@ -1053,6 +1068,7 @@ pub const Image = union(enum) {
     alpha16: Alpha16,
     gray: Gray,
     gray16: Gray16,
+    cmyk: CMYK,
 
     pub fn colorModel(self: Image) Color.Model {
         return switch (self) {
@@ -1064,6 +1080,7 @@ pub const Image = union(enum) {
             .alpha16 => Color.Alpha16Model,
             .gray => Color.GrayModel,
             .gray16 => Color.Gray16Model,
+            .cmyk => Color.CMYKModel,
         };
     }
 
@@ -1077,6 +1094,7 @@ pub const Image = union(enum) {
             .alpha16 => |i| i.rect,
             .gray => |i| i.rect,
             .gray16 => |i| i.rect,
+            .cmyk => |i| i.rect,
         };
     }
 
@@ -1791,7 +1809,67 @@ pub const Image = union(enum) {
         }
     };
 
-    pub const CMYK = struct {};
+    pub const CMYK = struct {
+        pix: []u8,
+        stride: isize,
+        rect: Rectangle,
+
+        pub fn init(a: *std.mem.Allocator, r: Rectangle) !CMYK {
+            return CMYK{
+                .pix = try createPix(a, 4, r, "CMYK"),
+                .stride = 4 * r.dx(),
+                .rect = r,
+            };
+        }
+
+        pub fn pixOffset(self: CMYK, x: isize, y: isize) usize {
+            const v = (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 4;
+            return @intCast(usize, v);
+        }
+
+        pub fn at(self: Gray16, x: isize, y: isize) ?Color {
+            const point = Point{ .x = x, .y = y };
+            if (!point.in(self.rect)) return null;
+            const i = self.pixOffset(x, y);
+            const s = self.pix[i .. i + 4];
+            return CMYK{
+                .c = s[0],
+                .m = s[1],
+                .y = s[2],
+                .k = s[3],
+            };
+        }
+
+        pub fn set(self: CMYK, x: isize, y: isize, c: Color) void {
+            const point = Point{ .x = x, .y = y };
+            if (point.in(self.rect)) {
+                const i = self.pixOffset(x, y);
+                const c1 = Color.CMYKModel.convert(c).cMYK;
+                var s = self.pix[i .. i + 4];
+                s[0] = c1.c;
+                s[1] = c1.y;
+                s[2] = c1.m;
+                s[3] = c1.k;
+            }
+        }
+
+        pub fn subImage(self: CMYK, r: Rectangle) ?Image {
+            const n = r.intersect(self.rect);
+            if (n.empty()) return null;
+            const i = self.pixOffset(r.min.x, r.min.y);
+            return Image{
+                .cmyk = CMYK{
+                    .pix = self.pix[i..],
+                    .stride = self.stride,
+                    .rect = r,
+                },
+            };
+        }
+
+        pub fn @"opaque"(self: CMYK) bool {
+            return true;
+        }
+    };
 
     pub const YCbCr = struct {
         pix: []u8,
