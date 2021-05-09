@@ -1908,7 +1908,27 @@ pub const Image = union(enum) {
         };
 
         pub fn init(a: *std.mem.Allocator, r: Rectangle, ratio: SusampleRatio) !YCbCr {
-            //TODO: implement me
+            const x = yCbCrSize(r, ratio);
+            const total_length = geom.add2NonNeg(
+                geom.mul3NonNeg(1, x.w, x.h),
+                geom.mul3NonNeg(2, x.cw, x.ch),
+            );
+            if (total_length < 0) {
+                return error.HugeOrNegativeRectange;
+            }
+            const i_0 = @bitcast(usize, x.w * x.h + 0 * x.cw * x.ch);
+            const i_1 = @bitCast(usize, x.w * x.h + 1 * x.cw * x.ch);
+            const i_2 = @bitCast(usize, x.w * x.h + 2 * x.cw * x.ch);
+            var b = a.alloc(u8, @bitCast(usize, i2));
+            return YCbCr{
+                .y = b[0..i_0],
+                .cb = b[0..i_1],
+                .cr = b[0..i_2],
+                .sub_sample_ration = ratio,
+                .ystride = x.w,
+                .cstride = x.cw,
+                .rect = r,
+            };
         }
 
         pub fn at(self: YCbCr, x: isize, y: isize) ?Color {
@@ -1979,6 +1999,47 @@ pub const Image = union(enum) {
 
         pub fn @"opaque"(self: YCbCr) bool {
             return true;
+        }
+
+        const yrs = struct {
+            w: isize,
+            h: isize,
+            cw: isize,
+            ch: isize,
+        };
+
+        fn yCbCrSize(r: Rectangle, ratio: SusampleRatio) yrs {
+            const w = r.dx();
+            const h = r.dy();
+            const x = yrs{
+                .w = r.dx(),
+                .h = r.dy(),
+                .cw = 0,
+                .ch = 0,
+            };
+            switch (ratio) {
+                .Ratio444 => {
+                    x.w = (r.max.x + 1) / 2 - r.min.x / 2;
+                    x.ch = x.h;
+                },
+                .Ratio420 => {
+                    x.cw = (r.max.x + 1) / 2 - r.min.x / 2;
+                    x.ch = (r.max.y + 1) / 2 - r.min.y / 2;
+                },
+                .Ratio440 => {
+                    x.cw = x.w;
+                    x.ch = (r.max.y + 1) / 2 - r.min.y / 2;
+                },
+                .Ratio411 => {
+                    x.cw = (r.max.x + 3) / 4 - r.min.x / 4;
+                    x.ch = x.h;
+                },
+                .Ratio410 => {
+                    x.cw = (r.max.x + 3) / 4 - r.min.x / 4;
+                    x.ch = (r.max.y + 1) / 2 - r.min.y / 2;
+                },
+            }
+            return x;
         }
     };
 
@@ -2086,6 +2147,47 @@ test "Image" {
         _ = m2.subImage(Rectangle.rect(10, 10, 10, 10));
         testing.allocator.free(m.get_pix());
     }
+}
+
+test "TestYCbCr" {
+    const rects = [_]Rectangle{
+        Rectangle.rect(0, 0, 16, 16),
+        Rectangle.rect(1, 0, 16, 16),
+        Rectangle.rect(0, 1, 16, 16),
+        Rectangle.rect(1, 1, 16, 16),
+        Rectangle.rect(1, 1, 15, 16),
+        Rectangle.rect(1, 1, 16, 15),
+        Rectangle.rect(1, 1, 15, 15),
+        Rectangle.rect(2, 3, 14, 15),
+        Rectangle.rect(7, 0, 7, 16),
+        Rectangle.rect(0, 8, 16, 8),
+        Rectangle.rect(0, 0, 10, 11),
+        Rectangle.rect(5, 6, 16, 16),
+        Rectangle.rect(7, 7, 8, 8),
+        Rectangle.rect(7, 8, 8, 9),
+        Rectangle.rect(8, 7, 9, 8),
+        Rectangle.rect(8, 8, 9, 9),
+        Rectangle.rect(7, 7, 17, 17),
+        Rectangle.rect(8, 8, 17, 17),
+        Rectangle.rect(9, 9, 17, 17),
+        Rectangle.rect(10, 10, 17, 17),
+    };
+
+    const sample_rations = [_]Image.YCbCr.SusampleRatio{
+        Image.YCbCr.SusampleRatio.Ratio444,
+        Image.YCbCr.SusampleRatio.Ratio422,
+        Image.YCbCr.SusampleRatio.Ratio420,
+        Image.YCbCr.SusampleRatio.Ratio440,
+        Image.YCbCr.SusampleRatio.Ratio411,
+        Image.YCbCr.SusampleRatio.Ratio410,
+    };
+
+    const deltas = [_]Point{
+        Point.init(0, 0),
+        Point.init(1000, 1001),
+        Point.init(5001, -400),
+        Point.init(-701, -801),
+    };
 }
 // === image TEST
 
