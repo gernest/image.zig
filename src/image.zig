@@ -2,6 +2,7 @@ const geom = @import("geom.zig");
 const std = @import("std");
 const testing = std.testing;
 const print = std.debug.print;
+const meta = std.meta;
 
 const Rectangle = geom.Rectangle;
 const Point = geom.Point;
@@ -266,11 +267,13 @@ pub const Color = union(enum) {
                 .cMYK => c,
                 else => {
                     const v = c.toValue();
-                    return rgbToCMYK(RGB{
-                        .r = @truncate(u8, v.r >> 8),
-                        .g = @truncate(u8, v.g >> 8),
-                        .b = @truncate(u8, v.b >> 8),
-                    });
+                    return Color{
+                        .cMYK = rgbToCMYK(RGB{
+                            .r = @truncate(u8, v.r >> 8),
+                            .g = @truncate(u8, v.g >> 8),
+                            .b = @truncate(u8, v.b >> 8),
+                        }),
+                    };
                 },
             };
         }
@@ -1110,6 +1113,7 @@ pub const Image = union(enum) {
             .alpha16 => |i| i.pix,
             .gray => |i| i.pix,
             .gray16 => |i| i.pix,
+            .cmyk => |i| i.pix,
         };
     }
 
@@ -1123,6 +1127,7 @@ pub const Image = union(enum) {
             .alpha16 => |i| i.at(x, y),
             .gray => |i| i.at(x, y),
             .gray16 => |i| i.at(x, y),
+            .cmyk => |i| i.at(x, y),
         };
     }
 
@@ -1136,6 +1141,7 @@ pub const Image = union(enum) {
             .alpha16 => |i| i.set(x, y, c),
             .gray => |i| i.set(x, y, c),
             .gray16 => |i| i.set(x, y, c),
+            .cmyk => |i| i.set(x, y, c),
         }
     }
 
@@ -1149,6 +1155,7 @@ pub const Image = union(enum) {
             .alpha16 => |i| i.subImage(r),
             .gray => |i| i.subImage(r),
             .gray16 => |i| i.subImage(r),
+            .cmyk => |i| i.subImage(r),
         };
     }
 
@@ -1162,6 +1169,7 @@ pub const Image = union(enum) {
             .alpha16 => |i| i.@"opaque"(),
             .gray => |i| i.@"opaque"(),
             .gray16 => |i| i.@"opaque"(),
+            .cmyk => |i| i.@"opaque"(),
         };
     }
 
@@ -1827,16 +1835,18 @@ pub const Image = union(enum) {
             return @intCast(usize, v);
         }
 
-        pub fn at(self: Gray16, x: isize, y: isize) ?Color {
+        pub fn at(self: CMYK, x: isize, y: isize) ?Color {
             const point = Point{ .x = x, .y = y };
             if (!point.in(self.rect)) return null;
             const i = self.pixOffset(x, y);
             const s = self.pix[i .. i + 4];
-            return CMYK{
-                .c = s[0],
-                .m = s[1],
-                .y = s[2],
-                .k = s[3],
+            return Color{
+                .cMYK = .{
+                    .c = s[0],
+                    .m = s[1],
+                    .y = s[2],
+                    .k = s[3],
+                },
             };
         }
 
