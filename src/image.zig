@@ -229,11 +229,11 @@ pub const Color = union(enum) {
                 else => {
                     const v = m.toValue();
                     return Color{
-                        .yCbCr = rgbToYCbCr(
-                            @intCast(u8, v.r >> 8),
-                            @intCast(u8, v.g >> 8),
-                            @intCast(u8, v.b >> 8),
-                        ),
+                        .yCbCr = rgbToYCbCr(RGB{
+                            .r = @intCast(u8, v.r >> 8),
+                            .g = @intCast(u8, v.g >> 8),
+                            .b = @intCast(u8, v.b >> 8),
+                        }),
                     };
                 },
             };
@@ -1072,6 +1072,7 @@ pub const Image = union(enum) {
     gray: Gray,
     gray16: Gray16,
     cmyk: CMYK,
+    yCbCr: YCbCr,
 
     pub fn colorModel(self: Image) Color.Model {
         return switch (self) {
@@ -1084,6 +1085,7 @@ pub const Image = union(enum) {
             .gray => Color.GrayModel,
             .gray16 => Color.Gray16Model,
             .cmyk => Color.CMYKModel,
+            .yCbCr => Color.YCbCrModel,
         };
     }
 
@@ -1098,6 +1100,7 @@ pub const Image = union(enum) {
             .gray => |i| i.rect,
             .gray16 => |i| i.rect,
             .cmyk => |i| i.rect,
+            .yCbCr => |i| i.rect,
         };
     }
 
@@ -1114,6 +1117,7 @@ pub const Image = union(enum) {
             .gray => |i| i.pix,
             .gray16 => |i| i.pix,
             .cmyk => |i| i.pix,
+            .yCbCr => unreachable,
         };
     }
 
@@ -1128,6 +1132,7 @@ pub const Image = union(enum) {
             .gray => |i| i.at(x, y),
             .gray16 => |i| i.at(x, y),
             .cmyk => |i| i.at(x, y),
+            .yCbCr => |i| i.at(x, y),
         };
     }
 
@@ -1142,6 +1147,7 @@ pub const Image = union(enum) {
             .gray => |i| i.set(x, y, c),
             .gray16 => |i| i.set(x, y, c),
             .cmyk => |i| i.set(x, y, c),
+            .yCbCr => unreachable,
         }
     }
 
@@ -1156,6 +1162,7 @@ pub const Image = union(enum) {
             .gray => |i| i.subImage(r),
             .gray16 => |i| i.subImage(r),
             .cmyk => |i| i.subImage(r),
+            .yCbCr => |i| i.subImage(r),
         };
     }
 
@@ -1170,6 +1177,7 @@ pub const Image = union(enum) {
             .gray => |i| i.@"opaque"(),
             .gray16 => |i| i.@"opaque"(),
             .cmyk => |i| i.@"opaque"(),
+            .yCbCr => unreachable,
         };
     }
 
@@ -1882,9 +1890,96 @@ pub const Image = union(enum) {
     };
 
     pub const YCbCr = struct {
-        pix: []u8,
-        stride: isize,
+        y: []u8,
+        cb: []u8,
+        cr: []u8,
+        sub_sample_ration: SusampleRatio,
+        ystride: isize,
+        cstride: isize,
         rect: Rectangle,
+
+        const SusampleRatio = enum {
+            Ratio444,
+            Ratio422,
+            Ratio420,
+            Ratio440,
+            Ratio411,
+            Ratio410,
+        };
+
+        pub fn init(a: *std.mem.Allocator, r: Rectangle, ratio: SusampleRatio) !YCbCr {
+            //TODO: implement me
+        }
+
+        pub fn at(self: YCbCr, x: isize, y: isize) ?Color {
+            const point = Point{ .x = x, .y = y };
+            if (!point.in(self.rect)) return null;
+            const yi = self.yOffset(x, y);
+            const ci = self.yOffset(x, y);
+            return Color{
+                .yCbCr = .{
+                    .y = self.y[yi],
+                    .cb = self.cb[ci],
+                    .cr = self.cr[ci],
+                },
+            };
+        }
+
+        pub fn yOffset(self: YCbCr, x: isize, y: isize) usize {
+            const v = (y - self.rect.min.y) * self.ystride + (x - self.rect.min.x);
+            return @intCast(usize, v);
+        }
+
+        pub fn cOffset(self: YCbCr, x: isize, y: isize) usize {
+            return switch (self.sub_sample_ration) {
+                .Ratio444 => {
+                    const v = (y - self.rect.min.y) * self.cstride + (x - self.rect.Min.x);
+                    return @intCast(usize, v);
+                },
+                .Ratio422 => {
+                    const v = (y - self.rect.min.y) * self.cstride + ((x / 2) - (self.rect.Min.x / 2));
+                    return @intCast(usize, v);
+                },
+                .Ratio420 => {
+                    const v = (y / 2 - self.rect.min.y / 2) * self.cstride + ((x / 2) - (self.rect.Min.x / 2));
+                    return @intCast(usize, v);
+                },
+                .Ratio440 => {
+                    const v = (y / 2 - self.rect.min.y / 2) * self.cstride + (x - self.rect.Min.x);
+                    return @intCast(usize, v);
+                },
+                .Ratio411 => {
+                    const v = (y - self.rect.min.y) * self.cstride + (x / 4 - self.rect.Min.x / 4);
+                    return @intCast(usize, v);
+                },
+                .Ratio410 => {
+                    const v = (y / 2 - self.rect.min.y / 2) * self.cstride + (x / 4 - self.rect.Min.x / 4);
+                    return @intCast(usize, v);
+                },
+            };
+        }
+
+        pub fn subImage(self: YCbCr, r: Rectangle) ?Image {
+            const n = r.intersect(self.rect);
+            if (n.empty()) return null;
+            const yi = self.yOffset(r.min.x, r.min.y);
+            const ci = self.yOffset(r.min.x, r.min.y);
+            return Image{
+                .yCbCr = YCbCr{
+                    .y = self.y[yi..],
+                    .cb = self.cb[ci..],
+                    .cr = self.cr[ci..],
+                    .sub_sample_ration = self.sub_sample_ration,
+                    .ystride = self.ystride,
+                    .cstride = self.cstride,
+                    .rect = r,
+                },
+            };
+        }
+
+        pub fn @"opaque"(self: YCbCr) bool {
+            return true;
+        }
     };
 
     pub const NYCbCrA = struct {
