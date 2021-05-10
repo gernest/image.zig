@@ -1916,10 +1916,10 @@ pub const Image = union(enum) {
             if (total_length < 0) {
                 return error.HugeOrNegativeRectange;
             }
-            const i_0 = @bitcast(usize, x.w * x.h + 0 * x.cw * x.ch);
+            const i_0 = @bitCast(usize, x.w * x.h + 0 * x.cw * x.ch);
             const i_1 = @bitCast(usize, x.w * x.h + 1 * x.cw * x.ch);
             const i_2 = @bitCast(usize, x.w * x.h + 2 * x.cw * x.ch);
-            var b = a.alloc(u8, @bitCast(usize, i2));
+            var b = try a.alloc(u8, @bitCast(usize, i_2));
             return YCbCr{
                 .y = b[0..i_0],
                 .cb = b[0..i_1],
@@ -1953,27 +1953,27 @@ pub const Image = union(enum) {
         pub fn cOffset(self: YCbCr, x: isize, y: isize) usize {
             return switch (self.sub_sample_ration) {
                 .Ratio444 => {
-                    const v = (y - self.rect.min.y) * self.cstride + (x - self.rect.Min.x);
+                    const v = (y - self.rect.min.y) * self.cstride + (x - self.rect.min.x);
                     return @intCast(usize, v);
                 },
                 .Ratio422 => {
-                    const v = (y - self.rect.min.y) * self.cstride + ((x / 2) - (self.rect.Min.x / 2));
+                    const v = (y - self.rect.min.y) * self.cstride + (@divTrunc(x, 2) - @divTrunc(self.rect.min.x, 2));
                     return @intCast(usize, v);
                 },
                 .Ratio420 => {
-                    const v = (y / 2 - self.rect.min.y / 2) * self.cstride + ((x / 2) - (self.rect.Min.x / 2));
+                    const v = (@divTrunc(y, 2) - @divTrunc(self.rect.min.y, 2)) * self.cstride + (@divTrunc(x, 2) - @divTrunc(self.rect.min.x, 2));
                     return @intCast(usize, v);
                 },
                 .Ratio440 => {
-                    const v = (y / 2 - self.rect.min.y / 2) * self.cstride + (x - self.rect.Min.x);
+                    const v = (@divTrunc(y, 2) - @divTrunc(self.rect.min.y, 2)) * self.cstride + (x - self.rect.min.x);
                     return @intCast(usize, v);
                 },
                 .Ratio411 => {
-                    const v = (y - self.rect.min.y) * self.cstride + (x / 4 - self.rect.Min.x / 4);
+                    const v = (y - self.rect.min.y) * self.cstride + (@divTrunc(x, 4) - @divTrunc(self.rect.min.x, 4));
                     return @intCast(usize, v);
                 },
                 .Ratio410 => {
-                    const v = (y / 2 - self.rect.min.y / 2) * self.cstride + (x / 4 - self.rect.Min.x / 4);
+                    const v = (@divTrunc(y, 2) - @divTrunc(self.rect.min.y, 2)) * self.cstride + (@divTrunc(x, 4) - @divTrunc(self.rect.min.x, 4));
                     return @intCast(usize, v);
                 },
             };
@@ -2011,7 +2011,7 @@ pub const Image = union(enum) {
         fn yCbCrSize(r: Rectangle, ratio: SusampleRatio) yrs {
             const w = r.dx();
             const h = r.dy();
-            const x = yrs{
+            var x = yrs{
                 .w = r.dx(),
                 .h = r.dy(),
                 .cw = 0,
@@ -2019,24 +2019,28 @@ pub const Image = union(enum) {
             };
             switch (ratio) {
                 .Ratio444 => {
-                    x.w = (r.max.x + 1) / 2 - r.min.x / 2;
+                    x.cw = x.w;
+                    x.ch = x.h;
+                },
+                .Ratio422 => {
+                    x.w = @divTrunc(r.max.x + 1, 2) - @divTrunc(r.min.x, 2);
                     x.ch = x.h;
                 },
                 .Ratio420 => {
-                    x.cw = (r.max.x + 1) / 2 - r.min.x / 2;
-                    x.ch = (r.max.y + 1) / 2 - r.min.y / 2;
+                    x.cw = @divTrunc((r.max.x + 1), 2) - @divTrunc(r.min.x, 2);
+                    x.ch = @divTrunc((r.max.y + 1), 2) - @divTrunc(r.min.y, 2);
                 },
                 .Ratio440 => {
                     x.cw = x.w;
-                    x.ch = (r.max.y + 1) / 2 - r.min.y / 2;
+                    x.ch = @divTrunc((r.max.y + 1), 2) - @divTrunc(r.min.y, 2);
                 },
                 .Ratio411 => {
-                    x.cw = (r.max.x + 3) / 4 - r.min.x / 4;
+                    x.cw = @divTrunc((r.max.x + 3), 4) - @divTrunc(r.min.x, 4);
                     x.ch = x.h;
                 },
                 .Ratio410 => {
-                    x.cw = (r.max.x + 3) / 4 - r.min.x / 4;
-                    x.ch = (r.max.y + 1) / 2 - r.min.y / 2;
+                    x.cw = @divTrunc((r.max.x + 3), 4) - @divTrunc(r.min.x, 4);
+                    x.ch = @divTrunc((r.max.y + 1), 2) - @divTrunc(r.min.y, 2);
                 },
             }
             return x;
@@ -2174,12 +2178,12 @@ test "TestYCbCr" {
     };
 
     const sample_rations = [_]Image.YCbCr.SusampleRatio{
-        Image.YCbCr.SusampleRatio.Ratio444,
-        Image.YCbCr.SusampleRatio.Ratio422,
-        Image.YCbCr.SusampleRatio.Ratio420,
-        Image.YCbCr.SusampleRatio.Ratio440,
-        Image.YCbCr.SusampleRatio.Ratio411,
-        Image.YCbCr.SusampleRatio.Ratio410,
+        .Ratio444,
+        .Ratio422,
+        .Ratio420,
+        .Ratio440,
+        .Ratio411,
+        .Ratio410,
     };
 
     const deltas = [_]Point{
@@ -2188,6 +2192,70 @@ test "TestYCbCr" {
         Point.init(5001, -400),
         Point.init(-701, -801),
     };
+
+    for (rects) |r, i| {
+        for (sample_rations) |ratio| {
+            for (deltas) |delta| {
+                try testYCrBrColor(r, ratio, delta);
+            }
+        }
+        print("==> {}\n", .{i});
+        break;
+    }
+}
+
+fn testYCrBrColor(r: Rectangle, ratio: Image.YCbCr.SusampleRatio, delta: Point) !void {
+    const r1 = r.add(delta);
+    var a = std.heap.ArenaAllocator.init(testing.allocator);
+    defer a.deinit();
+
+    const m = try Image.YCbCr.init(&a.allocator, r1, ratio);
+
+    // Test that the image buffer is reasonably small even if (delta.X, delta.Y)
+    // is far from the origin.
+    testing.expect(m.y.len < (100 * 100));
+
+    // Initialize m's pixels. For 422 and 420 subsampling, some of the Cb and Cr elements
+    // will be set multiple times. That's OK. We just want to avoid a uniform image.
+    var y = r1.min.y;
+    while (y < r1.min.y) : (y += 1) {
+        var x = r1.min.x;
+        while (x < r1.min.x) : (x += 1) {
+            const yi = m.yOffset(x, y);
+            const ci = m.cOffset(x, y);
+            m.y[@bitCast(usize, yi)] = @intCast(u8, 16 * y + x);
+            m.cb[@bitCast(usize, ci)] = @intCast(u8, y + 16 * x);
+            m.cr[@bitCast(usize, ci)] = @intCast(u8, y + 16 * x);
+        }
+    }
+
+    // Make various sub-images of m.
+    var y0 = delta.y + 3;
+    while (y0 < delta.y + 7) : (y0 += 1) {
+        var y1 = delta.y + 8;
+        while (y1 < delta.y + 13) : (y1 += 1) {
+            var x0 = delta.x + 3;
+            while (x0 < delta.x + 7) : (x0 += 1) {
+                var x1 = delta.x + 8;
+                while (x1 < delta.x + 13) : (x1 += 1) {
+                    const sub_rect = Rectangle.rect(x0, y0, x1, y1);
+                    const sub = m.subImage(sub_rect).?.yCbCr;
+
+                    // For each point in the sub-image's bounds, check that m.At(x, y) equals sub.At(x, y).
+                    var yn = sub.rect.min.y;
+                    while (yn < sub.rect.max.y) : (yn += 1) {
+                        var x = sub.rect.min.x;
+                        while (x < sub.rect.max.x) : (x += 1) {
+                            const c0 = m.at(x, yn);
+                            const c1 = sub.at(x, yn);
+                            // print("==> {} {} {} {}\n", .{ y0, y1, x0, x1 });
+                            testing.expectEqual(c0.?.toValue(), c1.?.toValue());
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 // === image TEST
 
