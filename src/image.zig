@@ -514,9 +514,9 @@ pub const Color = union(enum) {
     }
 
     const YCbCr = struct {
-        y: u8,
-        cb: u8,
-        cr: u8,
+        y: u8 = 0,
+        cb: u8 = 0,
+        cr: u8 = 0,
 
         pub fn toValue(self: YCbCr) Value {
             const yy1 = @intCast(i32, self.y) * 0x10101;
@@ -1890,13 +1890,13 @@ pub const Image = union(enum) {
     };
 
     pub const YCbCr = struct {
-        y: []u8,
-        cb: []u8,
-        cr: []u8,
-        sub_sample_ration: SusampleRatio,
-        ystride: isize,
-        cstride: isize,
-        rect: Rectangle,
+        y: []u8 = undefined,
+        cb: []u8 = undefined,
+        cr: []u8 = undefined,
+        sub_sample_ration: SusampleRatio = .Ratio444,
+        ystride: isize = 0,
+        cstride: isize = 0,
+        rect: Rectangle = Rectangle.zero(),
 
         const SusampleRatio = enum {
             Ratio444,
@@ -1933,7 +1933,9 @@ pub const Image = union(enum) {
 
         pub fn at(self: YCbCr, x: isize, y: isize) ?Color {
             const point = Point{ .x = x, .y = y };
-            if (!point.in(self.rect)) return null;
+            if (!point.in(self.rect)) return Color{
+                .yCbCr = .{},
+            };
             const yi = self.yOffset(x, y);
             const ci = self.yOffset(x, y);
             return Color{
@@ -1981,9 +1983,11 @@ pub const Image = union(enum) {
 
         pub fn subImage(self: YCbCr, r: Rectangle) ?Image {
             const n = r.intersect(self.rect);
-            if (n.empty()) return null;
+            if (n.empty()) return Image{
+                .yCbCr = .{},
+            };
             const yi = self.yOffset(r.min.x, r.min.y);
-            const ci = self.yOffset(r.min.x, r.min.y);
+            const ci = self.cOffset(r.min.x, r.min.y);
             return Image{
                 .yCbCr = YCbCr{
                     .y = self.y[yi..],
@@ -2199,8 +2203,8 @@ test "TestYCbCr" {
                 try testYCrBrColor(r, ratio, delta);
             }
         }
-        print("==> {}\n", .{i});
-        break;
+        print("==> {} {}\n", .{ i, r });
+        // break;
     }
 }
 
@@ -2239,6 +2243,7 @@ fn testYCrBrColor(r: Rectangle, ratio: Image.YCbCr.SusampleRatio, delta: Point) 
                 var x1 = delta.x + 8;
                 while (x1 < delta.x + 13) : (x1 += 1) {
                     const sub_rect = Rectangle.rect(x0, y0, x1, y1);
+                    // print("====== ({},{},{},{}) r={} r1={} {} {} {}\n", .{ x0, y0, x1, y1, r, r1, sub_rect.empty(), ratio, delta });
                     const sub = m.subImage(sub_rect).?.yCbCr;
 
                     // For each point in the sub-image's bounds, check that m.At(x, y) equals sub.At(x, y).

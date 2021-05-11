@@ -114,7 +114,7 @@ pub const Rectangle = struct {
 
     /// eEmpty reports whether the rectangle contains no points.
     pub fn empty(r: Rectangle) bool {
-        return r.min.x >= r.max.x or r.min.y >= r.max.y;
+        return (r.min.x >= r.max.x) or (r.min.y >= r.max.y);
     }
 
     pub fn add(r: Rectangle, p: Point) Rectangle {
