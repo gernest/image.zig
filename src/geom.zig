@@ -1,11 +1,16 @@
 const color = @import("color.zig");
-const testing = @import("std").testing;
-const debug = @import("std").debug;
+const std = @import("std");
+const testing = std.testing;
+const debug = std.debug;
 
 /// A Point is an X, Y coordinate pair. The axes increase right and down.
 pub const Point = struct {
     x: isize = 0,
     y: isize = 0,
+
+    pub fn format(self: Point, actual: []const u8, opts: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print("({},{})", .{ self.x, self.y });
+    }
 
     pub fn init(x: isize, y: isize) Point {
         return Point{ .x = x, .y = y };
@@ -55,6 +60,10 @@ pub const Point = struct {
 pub const Rectangle = struct {
     min: Point = Point{},
     max: Point = Point{},
+
+    pub fn format(self: Rectangle, actual: []const u8, opts: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print("{}-{}", .{ self.min, self.max });
+    }
 
     pub fn init(x0: isize, y0: isize, x1: isize, y1: isize) Rectangle {
         return Rectangle{

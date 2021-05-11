@@ -1916,10 +1916,10 @@ pub const Image = union(enum) {
             if (total_length < 0) {
                 return error.HugeOrNegativeRectange;
             }
-            const i_0 = @bitCast(usize, x.w * x.h + 0 * x.cw * x.ch);
-            const i_1 = @bitCast(usize, x.w * x.h + 1 * x.cw * x.ch);
-            const i_2 = @bitCast(usize, x.w * x.h + 2 * x.cw * x.ch);
-            var b = try a.alloc(u8, @bitCast(usize, i_2));
+            const i_0 = @intCast(usize, x.w * x.h + 0 * x.cw * x.ch);
+            const i_1 = @intCast(usize, x.w * x.h + 1 * x.cw * x.ch);
+            const i_2 = @intCast(usize, x.w * x.h + 2 * x.cw * x.ch);
+            var b = try a.alloc(u8, i_2);
             return YCbCr{
                 .y = b[0..i_0],
                 .cb = b[0..i_1],
@@ -1937,7 +1937,7 @@ pub const Image = union(enum) {
                 .yCbCr = .{},
             };
             const yi = self.yOffset(x, y);
-            const ci = self.yOffset(x, y);
+            const ci = self.cOffset(x, y);
             return Color{
                 .yCbCr = .{
                     .y = self.y[yi],
@@ -1949,34 +1949,34 @@ pub const Image = union(enum) {
 
         pub fn yOffset(self: YCbCr, x: isize, y: isize) usize {
             const v = (y - self.rect.min.y) * self.ystride + (x - self.rect.min.x);
-            return @intCast(usize, v);
+            return std.math.absCast(v);
         }
 
         pub fn cOffset(self: YCbCr, x: isize, y: isize) usize {
             return switch (self.sub_sample_ration) {
                 .Ratio444 => {
                     const v = (y - self.rect.min.y) * self.cstride + (x - self.rect.min.x);
-                    return @intCast(usize, v);
+                    return std.math.absCast(v);
                 },
                 .Ratio422 => {
                     const v = (y - self.rect.min.y) * self.cstride + (@divTrunc(x, 2) - @divTrunc(self.rect.min.x, 2));
-                    return @intCast(usize, v);
+                    return std.math.absCast(v);
                 },
                 .Ratio420 => {
                     const v = (@divTrunc(y, 2) - @divTrunc(self.rect.min.y, 2)) * self.cstride + (@divTrunc(x, 2) - @divTrunc(self.rect.min.x, 2));
-                    return @intCast(usize, v);
+                    return std.math.absCast(v);
                 },
                 .Ratio440 => {
                     const v = (@divTrunc(y, 2) - @divTrunc(self.rect.min.y, 2)) * self.cstride + (x - self.rect.min.x);
-                    return @intCast(usize, v);
+                    return std.math.absCast(v);
                 },
                 .Ratio411 => {
                     const v = (y - self.rect.min.y) * self.cstride + (@divTrunc(x, 4) - @divTrunc(self.rect.min.x, 4));
-                    return @intCast(usize, v);
+                    return std.math.absCast(v);
                 },
                 .Ratio410 => {
                     const v = (@divTrunc(y, 2) - @divTrunc(self.rect.min.y, 2)) * self.cstride + (@divTrunc(x, 4) - @divTrunc(self.rect.min.x, 4));
-                    return @intCast(usize, v);
+                    return std.math.absCast(v);
                 },
             };
         }
@@ -1986,8 +1986,8 @@ pub const Image = union(enum) {
             if (n.empty()) return Image{
                 .yCbCr = .{},
             };
-            const yi = self.yOffset(r.min.x, r.min.y);
-            const ci = self.cOffset(r.min.x, r.min.y);
+            const yi = self.yOffset(n.min.x, n.min.y);
+            const ci = self.cOffset(n.min.x, n.min.y);
             return Image{
                 .yCbCr = YCbCr{
                     .y = self.y[yi..],
@@ -1996,7 +1996,7 @@ pub const Image = union(enum) {
                     .sub_sample_ration = self.sub_sample_ration,
                     .ystride = self.ystride,
                     .cstride = self.cstride,
-                    .rect = r,
+                    .rect = n,
                 },
             };
         }
@@ -2027,7 +2027,7 @@ pub const Image = union(enum) {
                     x.ch = x.h;
                 },
                 .Ratio422 => {
-                    x.w = @divTrunc(r.max.x + 1, 2) - @divTrunc(r.min.x, 2);
+                    x.cw = @divTrunc(r.max.x + 1, 2) - @divTrunc(r.min.x, 2);
                     x.ch = x.h;
                 },
                 .Ratio420 => {
@@ -2203,8 +2203,6 @@ test "TestYCbCr" {
                 try testYCrBrColor(r, ratio, delta);
             }
         }
-        print("==> {} {}\n", .{ i, r });
-        // break;
     }
 }
 
@@ -2227,9 +2225,9 @@ fn testYCrBrColor(r: Rectangle, ratio: Image.YCbCr.SusampleRatio, delta: Point) 
         while (x < r1.min.x) : (x += 1) {
             const yi = m.yOffset(x, y);
             const ci = m.cOffset(x, y);
-            m.y[@bitCast(usize, yi)] = @intCast(u8, 16 * y + x);
-            m.cb[@bitCast(usize, ci)] = @intCast(u8, y + 16 * x);
-            m.cr[@bitCast(usize, ci)] = @intCast(u8, y + 16 * x);
+            m.y[@intCast(usize, yi)] = @intCast(u8, 16 * y + x);
+            m.cb[@intCast(usize, ci)] = @intCast(u8, y + 16 * x);
+            m.cr[@intCast(usize, ci)] = @intCast(u8, y + 16 * x);
         }
     }
 
@@ -2243,7 +2241,6 @@ fn testYCrBrColor(r: Rectangle, ratio: Image.YCbCr.SusampleRatio, delta: Point) 
                 var x1 = delta.x + 8;
                 while (x1 < delta.x + 13) : (x1 += 1) {
                     const sub_rect = Rectangle.rect(x0, y0, x1, y1);
-                    // print("====== ({},{},{},{}) r={} r1={} {} {} {}\n", .{ x0, y0, x1, y1, r, r1, sub_rect.empty(), ratio, delta });
                     const sub = m.subImage(sub_rect).?.yCbCr;
 
                     // For each point in the sub-image's bounds, check that m.At(x, y) equals sub.At(x, y).
@@ -2253,7 +2250,6 @@ fn testYCrBrColor(r: Rectangle, ratio: Image.YCbCr.SusampleRatio, delta: Point) 
                         while (x < sub.rect.max.x) : (x += 1) {
                             const c0 = m.at(x, yn);
                             const c1 = sub.at(x, yn);
-                            // print("==> {} {} {} {}\n", .{ y0, y1, x0, x1 });
                             testing.expectEqual(c0.toValue(), c1.toValue());
                         }
                     }
