@@ -1258,8 +1258,8 @@ pub const Image = union(enum) {
 
         pub fn subImage(self: RGBA, r: Rectangle) ?Image {
             const n = r.intersect(self.rect);
-            if (n.empty()) return null;
-            const i = self.pixOffset(r.min.x, r.min.y);
+            if (r.empty()) return null;
+            const i = self.pixOffset(n.min.x, n.min.y);
             return Image{
                 .rgba = RGBA{
                     .pix = self.pix[i..],
@@ -1385,9 +1385,9 @@ pub const Image = union(enum) {
             }
         }
 
-        pub fn subImage(self: RGBA64, r: Rectangle) ?Image {
-            const n = r.intersect(self.rect);
-            if (n.empty()) return null;
+        pub fn subImage(self: RGBA64, n: Rectangle) ?Image {
+            const r = n.intersect(self.rect);
+            if (r.empty()) return null;
             const i = self.pixOffset(r.min.x, r.min.y);
             return Image{
                 .rgba64 = RGBA64{
@@ -1458,9 +1458,9 @@ pub const Image = union(enum) {
             }
         }
 
-        pub fn subImage(self: NRGBA, r: Rectangle) ?Image {
-            const n = r.intersect(self.rect);
-            if (n.empty()) return null;
+        pub fn subImage(self: NRGBA, n: Rectangle) ?Image {
+            const r = n.intersect(self.rect);
+            if (r.empty()) return null;
             const i = self.pixOffset(r.min.x, r.min.y);
             return Image{
                 .nrgba = NRGBA{
@@ -1544,9 +1544,9 @@ pub const Image = union(enum) {
             }
         }
 
-        pub fn subImage(self: NRGBA64, r: Rectangle) ?Image {
-            const n = r.intersect(self.rect);
-            if (n.empty()) return null;
+        pub fn subImage(self: NRGBA64, n: Rectangle) ?Image {
+            const r = n.intersect(self.rect);
+            if (r.empty()) return null;
             const i = self.pixOffset(r.min.x, r.min.y);
             return Image{
                 .nrgba64 = NRGBA64{
@@ -1613,9 +1613,9 @@ pub const Image = union(enum) {
             }
         }
 
-        pub fn subImage(self: Alpha, r: Rectangle) ?Image {
-            const n = r.intersect(self.rect);
-            if (n.empty()) return null;
+        pub fn subImage(self: Alpha, n: Rectangle) ?Image {
+            const r = n.intersect(self.rect);
+            if (r.empty()) return null;
             const i = self.pixOffset(r.min.x, r.min.y);
             return Image{
                 .alpha = Alpha{
@@ -1684,9 +1684,9 @@ pub const Image = union(enum) {
             }
         }
 
-        pub fn subImage(self: Alpha16, r: Rectangle) ?Image {
-            const n = r.intersect(self.rect);
-            if (n.empty()) return null;
+        pub fn subImage(self: Alpha16, n: Rectangle) ?Image {
+            const r = n.intersect(self.rect);
+            if (r.empty()) return null;
             const i = self.pixOffset(r.min.x, r.min.y);
             return Image{
                 .alpha16 = Alpha16{
@@ -1753,9 +1753,9 @@ pub const Image = union(enum) {
             }
         }
 
-        pub fn subImage(self: Gray, r: Rectangle) ?Image {
-            const n = r.intersect(self.rect);
-            if (n.empty()) return null;
+        pub fn subImage(self: Gray, n: Rectangle) ?Image {
+            const r = n.intersect(self.rect);
+            if (r.empty()) return null;
             const i = self.pixOffset(r.min.x, r.min.y);
             return Image{
                 .gray = Gray{
@@ -1807,9 +1807,9 @@ pub const Image = union(enum) {
             }
         }
 
-        pub fn subImage(self: Gray16, r: Rectangle) ?Image {
-            const n = r.intersect(self.rect);
-            if (n.empty()) return null;
+        pub fn subImage(self: Gray16, n: Rectangle) ?Image {
+            const r = n.intersect(self.rect);
+            if (r.empty()) return null;
             const i = self.pixOffset(r.min.x, r.min.y);
             return Image{
                 .gray16 = Gray16{
@@ -1871,9 +1871,9 @@ pub const Image = union(enum) {
             }
         }
 
-        pub fn subImage(self: CMYK, r: Rectangle) ?Image {
-            const n = r.intersect(self.rect);
-            if (n.empty()) return null;
+        pub fn subImage(self: CMYK, n: Rectangle) ?Image {
+            const r = n.intersect(self.rect);
+            if (r.empty()) return null;
             const i = self.pixOffset(r.min.x, r.min.y);
             return Image{
                 .cmyk = CMYK{
@@ -1981,13 +1981,13 @@ pub const Image = union(enum) {
             };
         }
 
-        pub fn subImage(self: YCbCr, r: Rectangle) ?Image {
-            const n = r.intersect(self.rect);
-            if (n.empty()) return Image{
+        pub fn subImage(self: YCbCr, n: Rectangle) ?Image {
+            const r = n.intersect(self.rect);
+            if (r.empty()) return Image{
                 .yCbCr = .{},
             };
-            const yi = self.yOffset(n.min.x, n.min.y);
-            const ci = self.cOffset(n.min.x, n.min.y);
+            const yi = self.yOffset(r.min.x, r.min.y);
+            const ci = self.cOffset(r.min.x, r.min.y);
             return Image{
                 .yCbCr = YCbCr{
                     .y = self.y[yi..],
@@ -1996,7 +1996,7 @@ pub const Image = union(enum) {
                     .sub_sample_ration = self.sub_sample_ration,
                     .ystride = self.ystride,
                     .cstride = self.cstride,
-                    .rect = n,
+                    .rect = r,
                 },
             };
         }
