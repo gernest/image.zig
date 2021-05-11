@@ -304,10 +304,10 @@ pub const Color = union(enum) {
     };
 
     pub const RGBA64 = struct {
-        r: u16,
-        g: u16,
-        b: u16,
-        a: u16,
+        r: u16 = 0,
+        g: u16 = 0,
+        b: u16 = 0,
+        a: u16 = 0,
 
         fn toValue(c: RGBA64) Value {
             return Value{
@@ -320,10 +320,10 @@ pub const Color = union(enum) {
     };
 
     pub const NRGBA = struct {
-        r: u8,
-        g: u8,
-        b: u8,
-        a: u8,
+        r: u8 = 0,
+        g: u8 = 0,
+        b: u8 = 0,
+        a: u8 = 0,
 
         fn toValue(c: NRGBA) Value {
             var r: u32 = c.r;
@@ -350,10 +350,10 @@ pub const Color = union(enum) {
     };
 
     pub const NRGBA64 = struct {
-        r: u16,
-        g: u16,
-        b: u16,
-        a: u16,
+        r: u16 = 0,
+        g: u16 = 0,
+        b: u16 = 0,
+        a: u16 = 0,
 
         fn toValue(c: NRGBA64) Value {
             var r = @intCast(u32, c.r);
@@ -376,7 +376,7 @@ pub const Color = union(enum) {
     };
 
     pub const Alpha = struct {
-        a: u8,
+        a: u8 = 0,
 
         fn toValue(c: Alpha) Value {
             var a: u32 = c.a;
@@ -391,7 +391,7 @@ pub const Color = union(enum) {
     };
 
     pub const Alpha16 = struct {
-        a: u16,
+        a: u16 = 0,
 
         fn toValue(c: Alpha16) Value {
             return Value{
@@ -404,7 +404,7 @@ pub const Color = union(enum) {
     };
 
     pub const Gray = struct {
-        y: u8,
+        y: u8 = 0,
 
         fn toValue(c: Gray) Value {
             var y: u32 = c.y;
@@ -419,7 +419,7 @@ pub const Color = union(enum) {
     };
 
     pub const Gray16 = struct {
-        y: u16,
+        y: u16 = 0,
 
         fn toValue(c: Gray16) Value {
             var y: u32 = c.y;
@@ -707,10 +707,10 @@ pub const Color = union(enum) {
     }
 
     pub const CMYK = struct {
-        c: u8,
-        m: u8,
-        y: u8,
-        k: u8,
+        c: u8 = 0,
+        m: u8 = 0,
+        y: u8 = 0,
+        k: u8 = 0,
 
         pub fn toValue(self: CMYK) Value {
             const w = 0xffff - @intCast(u32, self.k) * 0x101;
@@ -1121,7 +1121,7 @@ pub const Image = union(enum) {
         };
     }
 
-    pub fn at(self: Image, x: isize, y: isize) ?Color {
+    pub fn at(self: Image, x: isize, y: isize) Color {
         return switch (self) {
             .rgba => |i| i.at(x, y),
             .rgba64 => |i| i.at(x, y),
@@ -1223,9 +1223,9 @@ pub const Image = union(enum) {
             };
         }
 
-        pub fn at(self: RGBA, x: isize, y: isize) ?Color {
+        pub fn at(self: RGBA, x: isize, y: isize) Color {
             const point = Point{ .x = x, .y = y };
-            if (!point.in(self.rect)) return null;
+            if (!point.in(self.rect)) return .{ .rgba = .{} };
             const i = self.pixOffset(x, y);
             const s = self.pix[i .. i + 4];
             return Color{
@@ -1349,9 +1349,9 @@ pub const Image = union(enum) {
             };
         }
 
-        pub fn at(self: RGBA64, x: isize, y: isize) ?Color {
+        pub fn at(self: RGBA64, x: isize, y: isize) Color {
             const point = Point{ .x = x, .y = y };
-            if (!point.in(self.rect)) return null;
+            if (!point.in(self.rect)) return .{ .rgba64 = .{} };
             const i = self.pixOffset(x, y);
             const s = self.pix[i .. i + 8];
             return Color{
@@ -1430,9 +1430,9 @@ pub const Image = union(enum) {
             };
         }
 
-        pub fn at(self: NRGBA, x: isize, y: isize) ?Color {
+        pub fn at(self: NRGBA, x: isize, y: isize) Color {
             const point = Point{ .x = x, .y = y };
-            if (!point.in(self.rect)) return null;
+            if (!point.in(self.rect)) return .{ .nrgba = .{} };
             const i = self.pixOffset(x, y);
             const s = self.pix[i .. i + 4];
             return Color{
@@ -1507,9 +1507,9 @@ pub const Image = union(enum) {
             };
         }
 
-        pub fn at(self: NRGBA64, x: isize, y: isize) ?Color {
+        pub fn at(self: NRGBA64, x: isize, y: isize) Color {
             const point = Point{ .x = x, .y = y };
-            if (!point.in(self.rect)) return null;
+            if (!point.in(self.rect)) return .{ .nrgba64 = .{} };
             const i = self.pixOffset(x, y);
             const s = self.pix[i .. i + 8];
             return Color{
@@ -1589,9 +1589,9 @@ pub const Image = union(enum) {
             };
         }
 
-        pub fn at(self: Alpha, x: isize, y: isize) ?Color {
+        pub fn at(self: Alpha, x: isize, y: isize) Color {
             const point = Point{ .x = x, .y = y };
-            if (!point.in(self.rect)) return null;
+            if (!point.in(self.rect)) return .{ .alpha = .{} };
             const i = self.pixOffset(x, y);
             return Color{
                 .alpha = .{
@@ -1658,9 +1658,9 @@ pub const Image = union(enum) {
             };
         }
 
-        pub fn at(self: Alpha16, x: isize, y: isize) ?Color {
+        pub fn at(self: Alpha16, x: isize, y: isize) Color {
             const point = Point{ .x = x, .y = y };
-            if (!point.in(self.rect)) return null;
+            if (!point.in(self.rect)) return .{ .alpha16 = .{} };
             const i = self.pixOffset(x, y);
             return Color{
                 .alpha16 = .{
@@ -1729,9 +1729,9 @@ pub const Image = union(enum) {
             };
         }
 
-        pub fn at(self: Gray, x: isize, y: isize) ?Color {
+        pub fn at(self: Gray, x: isize, y: isize) Color {
             const point = Point{ .x = x, .y = y };
-            if (!point.in(self.rect)) return null;
+            if (!point.in(self.rect)) return .{ .gray = .{} };
             const i = self.pixOffset(x, y);
             return Color{
                 .gray = .{
@@ -1782,9 +1782,9 @@ pub const Image = union(enum) {
                 .rect = r,
             };
         }
-        pub fn at(self: Gray16, x: isize, y: isize) ?Color {
+        pub fn at(self: Gray16, x: isize, y: isize) Color {
             const point = Point{ .x = x, .y = y };
-            if (!point.in(self.rect)) return null;
+            if (!point.in(self.rect)) return .{ .gray16 = .{} };
             const i = self.pixOffset(x, y);
             return Color{
                 .gray16 = .{
@@ -1843,9 +1843,9 @@ pub const Image = union(enum) {
             return @intCast(usize, v);
         }
 
-        pub fn at(self: CMYK, x: isize, y: isize) ?Color {
+        pub fn at(self: CMYK, x: isize, y: isize) Color {
             const point = Point{ .x = x, .y = y };
-            if (!point.in(self.rect)) return null;
+            if (!point.in(self.rect)) return .{ .cMYK = .{} };
             const i = self.pixOffset(x, y);
             const s = self.pix[i .. i + 4];
             return Color{
@@ -1931,7 +1931,7 @@ pub const Image = union(enum) {
             };
         }
 
-        pub fn at(self: YCbCr, x: isize, y: isize) ?Color {
+        pub fn at(self: YCbCr, x: isize, y: isize) Color {
             const point = Point{ .x = x, .y = y };
             if (!point.in(self.rect)) return Color{
                 .yCbCr = .{},
@@ -2134,20 +2134,20 @@ test "Image" {
 
         const r = Rectangle.init(0, 0, 10, 10);
         testing.expect(r.eq(m.bounds()));
-        testing.expect(cmp(m.colorModel(), Color.Transparent, m.at(6, 3).?));
+        testing.expect(cmp(m.colorModel(), Color.Transparent, m.at(6, 3)));
 
         m.set(6, 3, Color.Opaque);
-        testing.expect(cmp(m.colorModel(), Color.Opaque, m.at(6, 3).?));
+        testing.expect(cmp(m.colorModel(), Color.Opaque, m.at(6, 3)));
 
         testing.expect(m.subImage(Rectangle.rect(6, 3, 7, 4)).?.@"opaque"());
 
         const m2 = m.subImage(Rectangle.rect(3, 2, 9, 8)).?;
         testing.expect(Rectangle.rect(3, 2, 9, 8).eq(m2.bounds()));
 
-        testing.expect(cmp(m2.colorModel(), Color.Opaque, m2.at(6, 3).?));
-        testing.expect(cmp(m2.colorModel(), Color.Transparent, m2.at(3, 3).?));
+        testing.expect(cmp(m2.colorModel(), Color.Opaque, m2.at(6, 3)));
+        testing.expect(cmp(m2.colorModel(), Color.Transparent, m2.at(3, 3)));
         m2.set(3, 3, Color.Opaque);
-        testing.expect(cmp(m2.colorModel(), Color.Opaque, m2.at(3, 3).?));
+        testing.expect(cmp(m2.colorModel(), Color.Opaque, m2.at(3, 3)));
 
         _ = m2.subImage(Rectangle.rect(0, 0, 0, 0));
         _ = m2.subImage(Rectangle.rect(10, 0, 10, 0));
@@ -2254,7 +2254,7 @@ fn testYCrBrColor(r: Rectangle, ratio: Image.YCbCr.SusampleRatio, delta: Point) 
                             const c0 = m.at(x, yn);
                             const c1 = sub.at(x, yn);
                             // print("==> {} {} {} {}\n", .{ y0, y1, x0, x1 });
-                            testing.expectEqual(c0.?.toValue(), c1.?.toValue());
+                            testing.expectEqual(c0.toValue(), c1.toValue());
                         }
                     }
                 }
