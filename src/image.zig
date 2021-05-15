@@ -555,7 +555,7 @@ pub const Color = union(enum) {
     };
 
     const Palette = struct {
-        colors: []Color,
+        colors: []Color = undefined,
 
         const WebSafe: Palette = comptime {
             var colors: [6 * 6 * 6]Color = undefined;

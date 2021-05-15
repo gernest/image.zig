@@ -144,8 +144,15 @@ fn PNGReader(comptime ReaderType: type) type {
         width: usize,
         height: usize,
         depth: usize,
+        // pre allocated pallete array for this instance
+        palette_array: image.Color.Palette = comptime {
+            var ls: [256]image.Color = undefined;
+            return .{
+                .colors = ls[0..],
+            };
+        },
         palette: image.Color.Palette,
-        cb: usize,
+        cb: ColorDepth,
         stage: usize = 0,
         idat_lenght: u32 = 0,
         tmp: [3 * 256]u8 = []u8{0} ** 3 * 256,
