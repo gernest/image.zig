@@ -1,4 +1,7 @@
 const std = @import("std");
+const image = @import("../image.zig");
+
+const io = std.io;
 
 fn paeth(a: u8, b: u8, c: u8) u8 {
     const pc = @intCast(isize, c);
@@ -132,3 +135,30 @@ const DecodingStage = enum {
 };
 
 const png_header = "\x89PNG\r\n\x1a\n";
+
+fn PNGReader(comptime ReaderType: type) type {
+    return struct {
+        r: ReaderType,
+        image: image.Image,
+        crc: std.hash.Crc32 = std.hash.Crc32.init(),
+        width: usize,
+        height: usize,
+        depth: usize,
+        palette: image.Color.Palette,
+        cb: usize,
+        stage: usize = 0,
+        idat_lenght: u32 = 0,
+        tmp: [3 * 256]u8 = []u8{0} ** 3 * 256,
+        interlace: usize = 0,
+        use_transparent: bool = false,
+        transparent: [8]u8 = []u8{0} ** 8,
+
+        const Self = @This();
+        pub const Error = ReaderType.Error;
+        pub const Reader = io.Reader(*Self, Error, read);
+
+        pub fn rea(self: Self, buffer: []u8) Error!usize {
+            if (buffer.len == 0) return 0;
+        }
+    };
+}
