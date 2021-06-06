@@ -2,6 +2,7 @@ const std = @import("std");
 const image = @import("../image.zig");
 
 const io = std.io;
+const mem = std.mem;
 
 fn paeth(a: u8, b: u8, c: u8) u8 {
     const pc = @intCast(isize, c);
@@ -161,11 +162,42 @@ fn PNGReader(comptime ReaderType: type) type {
         transparent: [8]u8 = []u8{0} ** 8,
 
         const Self = @This();
-        pub const Error = ReaderType.Error;
+        pub const Error = ReaderType.Error || error{
+            NoEnoughPixelData,
+            InvalidChecksum,
+        };
         pub const Reader = io.Reader(*Self, Error, read);
 
-        pub fn rea(self: Self, buffer: []u8) Error!usize {
+        pub fn read(self: Self, buffer: []u8) Error!usize {
             if (buffer.len == 0) return 0;
+            while (self.idat_lenght == 0) {
+                try self.verifyChecksum();
+                d.idat_lenght = try self.r.readIntBig(u32);
+                try self.r.readAll(self.tmp[0..4]);
+                if (!mem.eql(u8, sel.tmp[0..4], "IDAT")) {
+                    return error.NoEnoughPixelData;
+                }
+                self.crc.crc = 0xffffffff;
+                self.crc.update(self.tmp[0..4]);
+            }
+            const n = try self.r.readAll(p[0..min(p.len, @intCast(usize, self.idat_lenght))]);
+            self.crc.update(p[0..n]);
+            self.idat_lenght -= @intCast(usize, n);
+            return n;
+        }
+
+        fn min(a: usize, b: usize) usize {
+            if (a < b) {
+                return a;
+            }
+            return b;
+        }
+
+        fn verifyChecksum(self: Self) !void {
+            const n = try self.r.readIntBig(u32);
+            if (n != self.crc.final()) {
+                return error.InvalidChecksum;
+            }
         }
     };
 }
