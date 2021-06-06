@@ -140,11 +140,11 @@ const png_header = "\x89PNG\r\n\x1a\n";
 fn PNGReader(comptime ReaderType: type) type {
     return struct {
         r: ReaderType,
-        image: image.Image,
+        img: image.Image = undefined,
         crc: std.hash.Crc32 = std.hash.Crc32.init(),
-        width: usize,
-        height: usize,
-        depth: usize,
+        width: usize = 0,
+        height: usize = 0,
+        depth: usize = 0,
         // pre allocated pallete array for this instance
         palette_array: image.Color.Palette = comptime {
             var ls: [256]image.Color = undefined;
@@ -153,34 +153,46 @@ fn PNGReader(comptime ReaderType: type) type {
             };
         },
         palette: image.Color.Palette,
-        cb: ColorDepth,
-        stage: usize = 0,
+        cb: ColorDepth = .Invalid,
+        stage: DecodingStage = .Start,
         idat_lenght: u32 = 0,
         tmp: [3 * 256]u8 = []u8{0} ** 3 * 256,
-        interlace: usize = 0,
+        interlace: Interlace = .None,
         use_transparent: bool = false,
         transparent: [8]u8 = []u8{0} ** 8,
 
         const Self = @This();
+
         pub const Error = ReaderType.Error || error{
             NoEnoughPixelData,
             InvalidChecksum,
         };
+
         pub const Reader = io.Reader(*Self, Error, read);
+
+        pub const zlib = std.compress.zlib.ZlibStream(Reader);
+
+        pub fn init(r: ReaderType) Self {
+            return .{ .r = r };
+        }
+
+        pub fn reader(Self: *Self) Reader {
+            return .{ .context = self };
+        }
 
         pub fn read(self: Self, buffer: []u8) Error!usize {
             if (buffer.len == 0) return 0;
             while (self.idat_lenght == 0) {
                 try self.verifyChecksum();
                 d.idat_lenght = try self.r.readIntBig(u32);
-                try self.r.readAll(self.tmp[0..4]);
+                try self.r.readNoEof(self.tmp[0..4]);
                 if (!mem.eql(u8, sel.tmp[0..4], "IDAT")) {
                     return error.NoEnoughPixelData;
                 }
                 self.crc.crc = 0xffffffff;
                 self.crc.update(self.tmp[0..4]);
             }
-            const n = try self.r.readAll(p[0..min(p.len, @intCast(usize, self.idat_lenght))]);
+            const n = try self.r.readNoEof(p[0..min(p.len, @intCast(usize, self.idat_lenght))]);
             self.crc.update(p[0..n]);
             self.idat_lenght -= @intCast(usize, n);
             return n;
@@ -199,5 +211,56 @@ fn PNGReader(comptime ReaderType: type) type {
                 return error.InvalidChecksum;
             }
         }
+
+        fn checkHeader(self: Self) !void {
+            _ = try self.r.readNoEof(self.tmp[0..png_header.len]);
+            if (!mem.eql(u8, self.tmp[0..png_header.len], png_header)) {
+                return error.NotPNGFile;
+            }
+        }
+
+        fn parseChunk(self: Self) !void {}
+
+        pub fn decode(self: Self, a: *mem.Allocator) !image.Image {
+            const r = try zlib.init(a, self.reader());
+            defer r.deinit();
+            var img: image.Image = undefined;
+            switch (self.interface) {
+                .None => {
+                    img = self.readImagePass(r.reader(), 0, false);
+                },
+                .Adam7 => {
+                    img = try self.readImagePass(null, 0, false);
+                },
+            }
+            // Check for EOF, to verify the zlib checksum.
+            var n: usize = 0;
+            var i: usize = 0;
+            while (true) : (i += 1) {
+                if (i == 100) {
+                    return error.NoProgress;
+                }
+                n = self.read(self.tmp[0..1]);
+                if (n == 0) {
+                    // we have reached EndOfStream
+                    if (self.idat_lenght > 0) {
+                        return error.TooMuchPixelData;
+                    }
+                    break;
+                }
+            }
+            return img;
+        }
+        fn readImagePass(self: Self, r: ?Reader, pass: usize, allocate_only: bool) !image.Image {}
     };
+}
+// decodePNG reads a PNG image from r and returns it as an image.Image.
+// The type of Image returned depends on the PNG contents.
+pub fn decodePNG(ReaderType: anytype) !image.Image {
+    const r = PNGReader(@TypeOf(ReaderType)).init(ReaderType);
+    try r.checkHeader();
+    while (r.stage != .SeenIEND) {
+        try r.parseChunk();
+    }
+    return r.img;
 }
