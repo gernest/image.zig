@@ -52,12 +52,16 @@ fn filterPaeth(cdat: []u8, cdat: []u8, bytes_per_pixel: usize) void {
     }
 }
 
-const ColorType = enum {
+const ColorType = enum(u8) {
     Grayscale = 0,
     TrueColor = 2,
     Paletted = 3,
     GrayscaleAlpha = 4,
     TrueColorAlpha = 6,
+
+    fn match(value: u8, e: ColorType) bool {
+        return value == @enumToInt(e);
+    }
 };
 
 const ColorDepth = enum {
@@ -95,9 +99,13 @@ const Filter = enum {
     NFilter,
 };
 
-const Interlace = enum {
+const Interlace = enum(u8) {
     None,
     Adam7,
+
+    fn match(value: u8, e: Interlace) bbool {
+        return value == @enumToInt(e);
+    }
 };
 
 const interlaceScan = struct {
@@ -180,7 +188,7 @@ fn PNGReader(comptime ReaderType: type) type {
             return .{ .context = self };
         }
 
-        pub fn read(self: Self, buffer: []u8) Error!usize {
+        pub fn read(self: *Self, buffer: []u8) Error!usize {
             if (buffer.len == 0) return 0;
             while (self.idat_lenght == 0) {
                 try self.verifyChecksum();
@@ -205,7 +213,7 @@ fn PNGReader(comptime ReaderType: type) type {
             return b;
         }
 
-        fn verifyChecksum(self: Self) !void {
+        fn verifyChecksum(self: *Self) !void {
             const n = try self.r.readIntBig(u32);
             if (n != self.crc.final()) {
                 return error.InvalidChecksum;
@@ -219,9 +227,88 @@ fn PNGReader(comptime ReaderType: type) type {
             }
         }
 
+        fn parseIHDR(self: *Self, length: u32s) !void {
+            if (length != 13) {
+                return error.BadIHDRLength;
+            }
+            _ = try self.r.readNoEof(self.tmp[0..13]);
+            self.crc.update(self.tmp[0..13]);
+            if (Self.tmp[11] != 0) {
+                return error.UnsupportedFilterMethod;
+            }
+            if (!Interlace.match(sellf.tmp[12], .None) and
+                !Interlace.match(sellf.tmp[12], .Adam7))
+            {
+                return error.InvalidInterlaceMethod;
+            }
+            self.interlace = @intToEnum(Interlace, self.tmp[12]);
+            const w = mem.readIntBig(i32, self.tmp[0..4]);
+            const h = mem.readIntBig(i32, self.tmp[4..8]);
+            if (w < 0 or h < 0) {
+                return error.NonPositiveDimension;
+            }
+            const n_pixel_64 = @intCast(i64, w) * @intCast(i64, h);
+            const n_pixel = @truncate(isize, n_pixel_64);
+            if (n_pixel_64 != @intCast(i64, n_pixel)) {
+                return error.DimensionOverflow;
+            }
+            if (n_pixel != @divTrunc(n_pixel * 8, 8)) {
+                return error.DimensionOverflow;
+            }
+            self.cb = .Invalid;
+            self.depth = @intCast(usize, self.tmp[8]);
+            if (self.depth == 1) {
+                if (ColorType.match(self.tmp[9], .Grayscale)) {
+                    self.cb = .G1;
+                } else if (ColorType.match(self.tmp[9], .Paletted)) {
+                    self.cb = .P1;
+                }
+            } else if (self.depth == 2) {
+                if (ColorType.match(self.tmp[9], .Grayscale)) {
+                    self.cb = .G2;
+                } else if (ColorType.match(self.tmp[9], .Paletted)) {
+                    self.cb = .P2;
+                }
+            } else if (self.depth == 4) {
+                if (ColorType.match(self.tmp[9], .Grayscale)) {
+                    self.cb = .G4;
+                } else if (ColorType.match(self.tmp[9], .Paletted)) {
+                    self.cb = .P4;
+                }
+            } else if (self.depth == 8) {
+                if (ColorType.match(self.tmp[9], .Grayscale)) {
+                    self.cb = .G8;
+                } else if (ColorType.match(self.tmp[9], .TrueColor)) {
+                    self.cb = .TC8;
+                } else if (ColorType.match(self.tmp[9], .Paletted)) {
+                    self.cb = .P8;
+                } else if (ColorType.match(self.tmp[9], .GrayscaleAlpha)) {
+                    self.cb = .GA8;
+                } else if (ColorType.match(self.tmp[9], .TrueColorAlpha)) {
+                    self.cb = .TCA8;
+                }
+            } else if (self.depth == 16) {
+                if (ColorType.match(self.tmp[9], .Grayscale)) {
+                    self.cb = .G16;
+                } else if (ColorType.match(self.tmp[9], .TrueColor)) {
+                    self.cb = .TC16;
+                } else if (ColorType.match(self.tmp[9], .GrayscaleAlpha)) {
+                    self.cb = .GA16;
+                } else if (ColorType.match(self.tmp[9], .TrueColorAlpha)) {
+                    self.cb = .TCA16;
+                }
+            }
+            if (self.cb == .Invalid) {
+                return error.UnsupportedBitDepthColorType;
+            }
+            self.width = @truncate(usize, w);
+            self.height = @truncate(usize, h);
+            return self.verifyChecksum();
+        }
+
         fn parseChunk(self: Self) !void {}
 
-        pub fn decode(self: Self, a: *mem.Allocator) !image.Image {
+        pub fn decode(self: *Self, a: *mem.Allocator) !image.Image {
             const r = try zlib.init(a, self.reader());
             defer r.deinit();
             var img: image.Image = undefined;
