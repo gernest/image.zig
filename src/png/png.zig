@@ -160,7 +160,7 @@ fn PNGReader(comptime ReaderType: type) type {
                 .colors = ls[0..],
             };
         },
-        palette: image.Color.Palette,
+        palette: image.Color.Palette = undefined,
         cb: ColorDepth = .Invalid,
         stage: DecodingStage = .Start,
         idat_lenght: u32 = 0,
@@ -188,17 +188,17 @@ fn PNGReader(comptime ReaderType: type) type {
             return .{ .context = self };
         }
 
-        pub fn read(self: *Self, buffer: []u8) Error!usize {
-            if (buffer.len == 0) return 0;
+        pub fn read(self: *Self, p: []u8) Error!usize {
+            if (p.len == 0) return 0;
             while (self.idat_lenght == 0) {
                 try self.verifyChecksum();
-                d.idat_lenght = try self.r.readIntBig(u32);
-                try self.r.readNoEof(self.tmp[0..4]);
-                if (!mem.eql(u8, sel.tmp[0..4], "IDAT")) {
+                d.idat_lenght = try self.readIntBig(u32);
+                const b = self.readBuff(4);
+                if (!mem.eql(u8, b, "IDAT")) {
                     return error.NoEnoughPixelData;
                 }
                 self.crc.crc = 0xffffffff;
-                self.crc.update(self.tmp[0..4]);
+                self.crc.update(b);
             }
             const n = try self.r.readNoEof(p[0..min(p.len, @intCast(usize, self.idat_lenght))]);
             self.crc.update(p[0..n]);
@@ -214,7 +214,7 @@ fn PNGReader(comptime ReaderType: type) type {
         }
 
         fn verifyChecksum(self: *Self) !void {
-            const n = try self.r.readIntBig(u32);
+            const n = try self.readIntBig(u32);
             if (n != self.crc.final()) {
                 return error.InvalidChecksum;
             }
@@ -227,23 +227,39 @@ fn PNGReader(comptime ReaderType: type) type {
             }
         }
 
+        fn readBuff(self: *Self, size: usize) ![]u8 {
+            _ = try self.r.readNoEof(self.tmp[0..size]);
+            return self.tmp[0..size];
+        }
+
+        fn readBufN(self: *Self, size: usize, n: *usize) ![]u8 {
+            const num = try self.r.readNoEof(self.tmp[0..size]);
+            n.* = num;
+            return self.tmp[0..size];
+        }
+
+        fn readIntBig(self: *Self, comptime T: type) !T {
+            const bytes = try self.readBuff((@typeInfo(T).Int.bits + 7) / 8);
+            return mem.readIntBig(T, bytes);
+        }
+
         fn parseIHDR(self: *Self, length: u32s) !void {
             if (length != 13) {
                 return error.BadIHDRLength;
             }
-            _ = try self.r.readNoEof(self.tmp[0..13]);
-            self.crc.update(self.tmp[0..13]);
-            if (Self.tmp[11] != 0) {
+            const b = try self.readBuff(13);
+            self.crc.update(b);
+            if (b[11] != 0) {
                 return error.UnsupportedFilterMethod;
             }
-            if (!Interlace.match(sellf.tmp[12], .None) and
-                !Interlace.match(sellf.tmp[12], .Adam7))
+            if (!Interlace.match(b[12], .None) and
+                !Interlace.match(b[12], .Adam7))
             {
                 return error.InvalidInterlaceMethod;
             }
             self.interlace = @intToEnum(Interlace, self.tmp[12]);
-            const w = mem.readIntBig(i32, self.tmp[0..4]);
-            const h = mem.readIntBig(i32, self.tmp[4..8]);
+            const w = mem.readIntBig(i32, b[0..4]);
+            const h = mem.readIntBig(i32, b[4..8]);
             if (w < 0 or h < 0) {
                 return error.NonPositiveDimension;
             }
@@ -256,45 +272,45 @@ fn PNGReader(comptime ReaderType: type) type {
                 return error.DimensionOverflow;
             }
             self.cb = .Invalid;
-            self.depth = @intCast(usize, self.tmp[8]);
+            self.depth = @intCast(usize, b[8]);
             if (self.depth == 1) {
-                if (ColorType.match(self.tmp[9], .Grayscale)) {
+                if (ColorType.match(b[9], .Grayscale)) {
                     self.cb = .G1;
-                } else if (ColorType.match(self.tmp[9], .Paletted)) {
+                } else if (ColorType.match(b[9], .Paletted)) {
                     self.cb = .P1;
                 }
             } else if (self.depth == 2) {
-                if (ColorType.match(self.tmp[9], .Grayscale)) {
+                if (ColorType.match(b[9], .Grayscale)) {
                     self.cb = .G2;
-                } else if (ColorType.match(self.tmp[9], .Paletted)) {
+                } else if (ColorType.match(b[9], .Paletted)) {
                     self.cb = .P2;
                 }
             } else if (self.depth == 4) {
-                if (ColorType.match(self.tmp[9], .Grayscale)) {
+                if (ColorType.match(b[9], .Grayscale)) {
                     self.cb = .G4;
-                } else if (ColorType.match(self.tmp[9], .Paletted)) {
+                } else if (ColorType.match(b[9], .Paletted)) {
                     self.cb = .P4;
                 }
             } else if (self.depth == 8) {
-                if (ColorType.match(self.tmp[9], .Grayscale)) {
+                if (ColorType.match(b[9], .Grayscale)) {
                     self.cb = .G8;
-                } else if (ColorType.match(self.tmp[9], .TrueColor)) {
+                } else if (ColorType.match(b[9], .TrueColor)) {
                     self.cb = .TC8;
-                } else if (ColorType.match(self.tmp[9], .Paletted)) {
+                } else if (ColorType.match(b[9], .Paletted)) {
                     self.cb = .P8;
-                } else if (ColorType.match(self.tmp[9], .GrayscaleAlpha)) {
+                } else if (ColorType.match(b[9], .GrayscaleAlpha)) {
                     self.cb = .GA8;
-                } else if (ColorType.match(self.tmp[9], .TrueColorAlpha)) {
+                } else if (ColorType.match(b[9], .TrueColorAlpha)) {
                     self.cb = .TCA8;
                 }
             } else if (self.depth == 16) {
-                if (ColorType.match(self.tmp[9], .Grayscale)) {
+                if (ColorType.match(b[9], .Grayscale)) {
                     self.cb = .G16;
-                } else if (ColorType.match(self.tmp[9], .TrueColor)) {
+                } else if (ColorType.match(b[9], .TrueColor)) {
                     self.cb = .TC16;
-                } else if (ColorType.match(self.tmp[9], .GrayscaleAlpha)) {
+                } else if (ColorType.match(b[9], .GrayscaleAlpha)) {
                     self.cb = .GA16;
-                } else if (ColorType.match(self.tmp[9], .TrueColorAlpha)) {
+                } else if (ColorType.match(b[9], .TrueColorAlpha)) {
                     self.cb = .TCA16;
                 }
             }
@@ -303,6 +319,59 @@ fn PNGReader(comptime ReaderType: type) type {
             }
             self.width = @truncate(usize, w);
             self.height = @truncate(usize, h);
+            return self.verifyChecksum();
+        }
+
+        fn parsePLTE(self: *Self, length: u32) !void {
+            const np = @intCast(usize, @divTrunc(length, 3));
+            if (@mod(length, 3) != 0 or
+                np <= 0 or np > 256 or
+                np > (@shlExact(@as(usize, 1), self.depth)))
+            {
+                return error.BadPLTELLength;
+            }
+            var n: usize = 0;
+            const b = try self.readBufN(3 * np, &n);
+            self.crc.update(b);
+            switch (self.cb) {
+                .P1, .P2, .P4, .P8 => {
+                    var i: usize = 0;
+                    while (i < np) : (i += 1) {
+                        self.palette_array[i] = .{
+                            .rgba = .{
+                                .r = b[3 * i + 0],
+                                .g = b[3 * i + 1],
+                                .b = b[3 * i + 2],
+                                .a = 0xff,
+                            },
+                        };
+                    }
+                    i = 0;
+                    while (i < 256) : (i += 1) {
+                        // Initialize the rest of the palette to opaque black. The spec (section
+                        // 11.2.3) says that "any out-of-range pixel value found in the image data
+                        // is an error", but some real-world PNG files have out-of-range pixel
+                        // values. We fall back to opaque black, the same as libpng 1.5.13;
+                        // ImageMagick 6.5.7 returns an error.
+                        self.palette_array[i] = .{
+                            .rgba = .{
+                                .r = 0x00,
+                                .g = 0x00,
+                                .b = 0x00,
+                                .a = 0xff,
+                            },
+                        };
+                    }
+                    self.palette = self.palette_array[0..np];
+                },
+                .TC8, .TCA8, .TC16, .TCA16 => {
+                    // As per the PNG spec, a PLTE chunk is optional (and for practical purposes,
+                    // ignorable) for the ctTrueColor and ctTrueColorAlpha color types (section 4.1.2).de
+                },
+                else => {
+                    return error.PLTEColorTypeMismatch;
+                },
+            }
             return self.verifyChecksum();
         }
 
