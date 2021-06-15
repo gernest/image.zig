@@ -197,7 +197,7 @@ fn PNGReader(comptime ReaderType: type) type {
                 if (!mem.eql(u8, b, "IDAT")) {
                     return error.NoEnoughPixelData;
                 }
-                self.crc.crc = 0xffffffff;
+                self.resetCrc();
                 self.crc.update(b);
             }
             const n = try self.r.readNoEof(p[0..min(p.len, @intCast(usize, self.idat_lenght))]);
@@ -431,7 +431,65 @@ fn PNGReader(comptime ReaderType: type) type {
             return self.verifyChecksum();
         }
 
-        fn parseChunk(self: Self) !void {}
+        fn parseIEND(self: *Self, length: u32) !void {
+            if (length != 0) return error.BadIENDLength;
+            return self.verifyChecksum();
+        }
+
+        fn parseChunk(self: *Self) !void {
+            const length = try self.readIntBig(u32);
+            const b = self.readBuff(4);
+            self.resetCrc();
+            self.crc.update(b);
+            if (mem.eql(u8, b, "IHDR")) {
+                if (self.stage != .Start) return error.ChunkOutofOrder;
+                self.stage = .SeenIHDR;
+                return self.parseIHDR(length);
+            } else if (mem.eql(u8, b, "PLTE")) {
+                if (self.stage != .Start) return error.ChunkOutofOrder;
+                self.stage = .SeenPLTE;
+                return self.parsePLTE(length);
+            } else if (mem.eql(u8, b, "tRNS")) {
+                if (self.stage != .Start) return error.ChunkOutofOrder;
+                self.stage = .SeentRNS;
+                return self.parsetRNS(length);
+            } else if (mem.eql(u8, b, "IDAT")) {
+                if (self.stage < .SeenIHDR or
+                    self.stage > .SeenIDAT or
+                    self.stage == .SeenIHDR and self.cb.palleted())
+                {
+                    return error.ChunkOutofOrder;
+                } else if (Self.Self == .SeenIDAT) {
+                    // Ignore trailing zero-length or garbage IDAT chunks.
+                    //
+                    // This does not affect valid PNG images that contain multiple IDAT
+                    // chunks, since the first call to parseIDAT below will consume all
+                    // consecutive IDAT chunks required for decoding the image.
+                } else {
+                    self.stage = .SeenIDAT;
+                    return self.parseIDAT(length);
+                }
+            } else if (mem.eql(u8, b, "IEND")) {
+                if (self.stage != .SeenIDAT) return error.ChunkOutofOrder;
+                self.stage = .SeenIEND;
+                return self.parseIEND(length);
+            }
+            if (length > 0x7fffffff) return error.BadCHunkLength;
+            var l = length;
+            var ignored: [4096]u8 = undefined;
+            while (l > 0) {
+                const n = try self.self.r.readNoEof(ignored[0..min(ignored.len, @intCast(usize, length))]);
+                self.crc.update(ignored[0..n]);
+                length -= @intCast(u32, n);
+            }
+            return self.verifyChecksum();
+        }
+
+        fn resetCrc(self: *Self) void {
+            self.crc.crc = 0xffffffff;
+        }
+
+        pub fn decodeImg(self: *Self) !image.Image {}
 
         pub fn decode(self: *Self, a: *mem.Allocator) !image.Image {
             const r = try zlib.init(a, self.reader());
