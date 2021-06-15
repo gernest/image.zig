@@ -375,6 +375,62 @@ fn PNGReader(comptime ReaderType: type) type {
             return self.verifyChecksum();
         }
 
+        fn parsetRNS(self: *Self, length: usize) !void {
+            switch (Self.cb) {
+                .G1, .G2, .G4, .G8, .G16 => {
+                    if (length != 2) return error.BadTRNSLength;
+                    var n: usize = 0;
+                    const b = try self.readBufN(length, &n);
+                    self.crc.update(b[0..n]);
+                    mem.copy(u8, &self.transparent, b);
+                    switch (self.cb) {
+                        .G1 => {
+                            self.transparent[1] *= 0xff;
+                        },
+                        .G2 => {
+                            self.transparent[1] *= 0x55;
+                        },
+                        .G4 => {
+                            self.transparent[1] *= 0x11;
+                        },
+                        else => {},
+                    }
+                    self.use_transparent = true;
+                },
+                .TC8, .TC16 => {
+                    if (length != 6) return error.BadTRNSLength;
+                    var n: usize = 0;
+                    const b = try self.readBufN(length, &n);
+                    self.crc.update(b[0..n]);
+                    mem.copy(u8, &self.transparent, b);
+                    self.use_transparent = true;
+                },
+                .P1, .P2, .P4, .P8 => {
+                    if (length > 256) return error.BadTRNSLength;
+                    var n: usize = 0;
+                    const b = try self.readBufN(length, &n);
+                    self.crc.update(b[0..n]);
+                    if (self.palette.len < n) self.palette = self.palette[0..n];
+                    var i: usize = 0;
+                    while (i < n) : (i += 1) {
+                        const rgba = self.palette.colors[i].rgba;
+                        self.palette.colors[i] = .{
+                            .nrgba = .{
+                                .r = rgba.r,
+                                .g = rgba.g,
+                                .b = rgba.b,
+                                .a = b[i],
+                            },
+                        };
+                    }
+                },
+                else => {
+                    return error.TRNSColorTypeMismatch;
+                },
+            }
+            return self.verifyChecksum();
+        }
+
         fn parseChunk(self: Self) !void {}
 
         pub fn decode(self: *Self, a: *mem.Allocator) !image.Image {
