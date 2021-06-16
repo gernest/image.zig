@@ -431,12 +431,18 @@ fn PNGReader(comptime ReaderType: type) type {
             return self.verifyChecksum();
         }
 
+        fn parseIDAT(self: *Self, a: *mem.Allocator, length: u32) !void {
+            self.idat_lenght = length;
+            self.img = self.decode(a);
+            return self.verifyChecksum();
+        }
+
         fn parseIEND(self: *Self, length: u32) !void {
             if (length != 0) return error.BadIENDLength;
             return self.verifyChecksum();
         }
 
-        fn parseChunk(self: *Self) !void {
+        fn parseChunk(self: *Self, a: *mem.Allocator) !void {
             const length = try self.readIntBig(u32);
             const b = self.readBuff(4);
             self.resetCrc();
@@ -467,7 +473,7 @@ fn PNGReader(comptime ReaderType: type) type {
                     // consecutive IDAT chunks required for decoding the image.
                 } else {
                     self.stage = .SeenIDAT;
-                    return self.parseIDAT(length);
+                    return self.parseIDAT(a, length);
                 }
             } else if (mem.eql(u8, b, "IEND")) {
                 if (self.stage != .SeenIDAT) return error.ChunkOutofOrder;
@@ -488,8 +494,6 @@ fn PNGReader(comptime ReaderType: type) type {
         fn resetCrc(self: *Self) void {
             self.crc.crc = 0xffffffff;
         }
-
-        pub fn decodeImg(self: *Self) !image.Image {}
 
         pub fn decode(self: *Self, a: *mem.Allocator) !image.Image {
             const r = try zlib.init(a, self.reader());
@@ -526,11 +530,26 @@ fn PNGReader(comptime ReaderType: type) type {
 }
 // decodePNG reads a PNG image from r and returns it as an image.Image.
 // The type of Image returned depends on the PNG contents.
-pub fn decodePNG(ReaderType: anytype) !image.Image {
+pub fn decodePNG(a: *mem.Allocator, ReaderType: anytype) !Image {
     const r = PNGReader(@TypeOf(ReaderType)).init(ReaderType);
     try r.checkHeader();
+    var m: Image = .{
+        .arena = std.heap.ArenaAllocator.init(a),
+    };
     while (r.stage != .SeenIEND) {
-        try r.parseChunk();
+        try r.parseChunk(&m.arena.allocator);
     }
-    return r.img;
+    m.img = r.img;
+    return m;
 }
+/// Represents a decoded png image. All allocations that are part of the
+/// returned image are done on the arena allocator. Call deinit to free up memory
+/// when you no longer need the decoded image
+pub const Image = struct {
+    img: image.Image = undefined,
+    arena: std.heap.ArenaAllocator,
+
+    pub fn deinit(self: *Image) void {
+        self.arena.deinit();
+    }
+};
