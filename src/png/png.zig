@@ -501,10 +501,17 @@ fn PNGReader(comptime ReaderType: type) type {
             var img: image.Image = undefined;
             switch (self.interface) {
                 .None => {
-                    img = self.readImagePass(r.reader(), 0, false);
+                    img = self.readImagePass(a, r.reader(), 0, false);
                 },
                 .Adam7 => {
-                    img = try self.readImagePass(null, 0, false);
+                    img = try self.readImagePass(a, null, 0, false);
+                    var pass: usize = 0;
+                    while (pass < 7) : (pass += 1) {
+                        const img_pass = try self.readImagePass(a, r.reader(), pass, false);
+                        if (img_pass != null) {
+                            img = self.mergePassInfo(img, img_pass, pass);
+                        }
+                    }
                 },
             }
             // Check for EOF, to verify the zlib checksum.
@@ -525,7 +532,55 @@ fn PNGReader(comptime ReaderType: type) type {
             }
             return img;
         }
-        fn readImagePass(self: Self, r: ?Reader, pass: usize, allocate_only: bool) !image.Image {}
+
+        fn mergePassInfo(self: *Self, dest: image.Image, src: image.Image, pass: usize) image.Image {}
+
+        fn readImagePass(self: *Self, a: *mem.Allocator, r: ?Reader, pass: usize, allocate_only: bool) !?image.Image {
+            var bits_per_pixel: usize = 0;
+            var pix_offset: usize = 0;
+            var gray: ?image.Image.Gray = null;
+            var rgba: ?image.Image.RGBA = null;
+            // var palleted: ?image.Image.Palleted = null;
+            var nrgba: ?image.Image.NRGBA = null;
+            var gray16: ?image.Image.Gray16 = null;
+            var rgba64: ?image.Image.RGBA64 = null;
+            var nrgba64: ?image.Image.NRGBA64 = null;
+            var width = self.width;
+            var height = self.height;
+            if (self.interlace == .Adam7 and !allocate_only) {
+                const p = interlacing[pass];
+                // Add the multiplication factor and subtract one, effectively rounding up.
+                width = (width - p.xo + p.xf - 1) / p.xf;
+                height = (height - p.yo + p.yf - 1) / p.yf;
+                // A PNG image can't have zero width or height, but for an interlaced
+                // image, an individual pass might have zero width or height. If so, we
+                // shouldn't even read a per-row filter type byte, so return early.
+                if (width == 0 or height == 0) return null;
+            }
+            switch (self.cb) {
+                .G1, .G2, .G4, .G8 => {
+                    bits_per_pixel = self.depth;
+                    if (self.use_transparent) {
+                        nrgba = try image.Image.NRGBA.init(a, image.Rectangle.rect(0, 9, WIDTH, HEIGHT));
+                        img = image.Image{
+                            .nrgba = nrgba,
+                        };
+                    } else {
+                        gray = try image.Image.Gray.init(a, image.Rectangle.rect(0, 9, WIDTH, HEIGHT));
+                        img = image.Image{
+                            .nrgba = nrgba,
+                        };
+                    }
+                },
+                .GA8 => {
+                    bits_per_pixel = 16;
+                    nrgba = try image.Image.NRGBA.init(a, image.Rectangle.rect(0, 9, WIDTH, HEIGHT));
+                    img = image.Image{
+                        .nrgba = nrgba,
+                    };
+                },
+            }
+        }
     };
 }
 // decodePNG reads a PNG image from r and returns it as an image.Image.
