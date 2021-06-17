@@ -49,7 +49,7 @@ pub const Color = union(enum) {
     pub const Model = struct {
         convert: fn (c: Color) Color,
 
-        pub fn rgbaModel(m: Color) Color {
+        pub fn rgba(m: Color) Color {
             return switch (m) {
                 .rgba => m,
                 else => {
@@ -65,7 +65,7 @@ pub const Color = union(enum) {
             };
         }
 
-        pub fn rgba64Model(m: Color) Color {
+        pub fn rgba64(m: Color) Color {
             return switch (m) {
                 .rgba64 => m,
                 else => {
@@ -81,7 +81,7 @@ pub const Color = union(enum) {
             };
         }
 
-        pub fn nrgbaModel(m: Color) Color {
+        pub fn nrgba(m: Color) Color {
             return switch (m) {
                 .nrgba => m,
                 else => {
@@ -118,7 +118,7 @@ pub const Color = union(enum) {
             };
         }
 
-        pub fn nrgba64Model(m: Color) Color {
+        pub fn nrgba64(m: Color) Color {
             return switch (m) {
                 .nrgba64 => m,
                 else => {
@@ -161,7 +161,7 @@ pub const Color = union(enum) {
             return r;
         }
 
-        pub fn alphaModel(m: Color) Color {
+        pub fn alpha(m: Color) Color {
             return switch (m) {
                 .alpha => m,
                 else => {
@@ -172,7 +172,7 @@ pub const Color = union(enum) {
             };
         }
 
-        pub fn alpha16Model(m: Color) Color {
+        pub fn alpha16(m: Color) Color {
             return switch (m) {
                 .alpha16 => m,
                 else => {
@@ -183,7 +183,7 @@ pub const Color = union(enum) {
             };
         }
 
-        pub fn grayModel(m: Color) Color {
+        pub fn gray(m: Color) Color {
             return switch (m) {
                 .gray => m,
                 else => {
@@ -203,7 +203,7 @@ pub const Color = union(enum) {
             };
         }
 
-        pub fn gray16Model(m: Color) Color {
+        pub fn gray16(m: Color) Color {
             return switch (m) {
                 .gray16 => m,
                 else => {
@@ -220,7 +220,7 @@ pub const Color = union(enum) {
             };
         }
 
-        pub fn yCbCrModel(m: Color) Color {
+        pub fn yCbCr(m: Color) Color {
             return switch (m) {
                 .yCbCr => m,
                 else => {
@@ -236,7 +236,7 @@ pub const Color = union(enum) {
             };
         }
 
-        pub fn nYCbCrAModel(m: Color) Color {
+        pub fn nYCbCrA(m: Color) Color {
             return switch (m) {
                 .nYCbCrA => m,
                 .yCbCr => |c| .{
@@ -267,7 +267,7 @@ pub const Color = union(enum) {
             };
         }
 
-        pub fn cmykModel(c: Color) Color {
+        pub fn cmyk(c: Color) Color {
             return switch (c) {
                 .cMYK => c,
                 else => {
@@ -437,17 +437,17 @@ pub const Color = union(enum) {
         }
     };
 
-    pub const RGBAModel = Model{ .convert = Model.rgbaModel };
-    pub const RGBA64Model = Model{ .convert = Model.rgba64Model };
-    pub const NRGBAModel = Model{ .convert = Model.nrgbaModel };
-    pub const NRGBA64Model = Model{ .convert = Model.nrgba64Model };
-    pub const AlphaModel = Model{ .convert = Model.alphaModel };
-    pub const Alpha16Model = Model{ .convert = Model.alpha16Model };
-    pub const GrayModel = Model{ .convert = Model.grayModel };
-    pub const Gray16Model = Model{ .convert = Model.gray16Model };
-    pub const YCbCrModel = Model{ .convert = Model.yCbCrModel };
-    pub const NYCbCrAModel = Model{ .convert = Model.nYCbCrAModel };
-    pub const CMYKModel = Model{ .convert = Model.cmykModel };
+    pub const RGBAModel = Model{ .convert = Model.rgba };
+    pub const RGBA64Model = Model{ .convert = Model.rgba64 };
+    pub const NRGBAModel = Model{ .convert = Model.nrgba };
+    pub const NRGBA64Model = Model{ .convert = Model.nrgba64 };
+    pub const AlphaModel = Model{ .convert = Model.alpha };
+    pub const Alpha16Model = Model{ .convert = Model.alpha16 };
+    pub const GrayModel = Model{ .convert = Model.gray };
+    pub const Gray16Model = Model{ .convert = Model.gray16 };
+    pub const YCbCrModel = Model{ .convert = Model.yCbCr };
+    pub const NYCbCrAModel = Model{ .convert = Model.nYCbCrA };
+    pub const CMYKModel = Model{ .convert = Model.cmyk };
 
     pub const Black = Color{ .gray = Gray{ .y = 0 } };
     pub const White = Color{ .gray = Gray{ .y = 0xffff } };
@@ -1468,19 +1468,19 @@ pub const Image = union(enum) {
     yCbCr: YCbCr,
     nYCbCrA: NYCbCrA,
 
-    pub fn colorModel(self: Image) Color.Model {
+    pub fn convert(self: Image, c: Color) Color {
         return switch (self) {
-            .rgba => Color.RGBAModel,
-            .rgba64 => Color.RGBA64Model,
-            .nrgba => Color.RGBA64Model,
-            .nrgba64 => Color.NRGBA64Model,
-            .alpha => Color.AlphaModel,
-            .alpha16 => Color.Alpha16Model,
-            .gray => Color.GrayModel,
-            .gray16 => Color.Gray16Model,
-            .cmyk => Color.CMYKModel,
-            .yCbCr => Color.YCbCrModel,
-            .nYCbCrA => Color.NYCbCrAModel,
+            .rgba => Color.RGBAModel.convert(c),
+            .rgba64 => Color.RGBA64Model.convert(c),
+            .nrgba => Color.RGBA64Model.convert(c),
+            .nrgba64 => Color.NRGBA64Model.convert(c),
+            .alpha => Color.AlphaModel.convert(c),
+            .alpha16 => Color.Alpha16Model.convert(c),
+            .gray => Color.GrayModel.convert(c),
+            .gray16 => Color.Gray16Model.convert(c),
+            .cmyk => Color.CMYKModel.convert(c),
+            .yCbCr => Color.YCbCrModel.convert(c),
+            .nYCbCrA => Color.NYCbCrAModel.convert(c),
         };
     }
 
@@ -2196,6 +2196,7 @@ pub const Image = union(enum) {
             const v = (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 2;
             return @intCast(usize, v);
         }
+
         pub fn set(self: Gray16, x: isize, y: isize, c: Color) void {
             const point = Point{ .x = x, .y = y };
             if (point.in(self.rect)) {
@@ -2539,6 +2540,14 @@ pub const Image = union(enum) {
             return true;
         }
     };
+
+    // Paletted is an in-memory image of uint8 indices into a given palette.
+    pub const Paletted = struct {
+        pix: []u8,
+        stride: isize,
+        rect: Rectangle,
+        palete: Color.Palette,
+    };
 };
 
 // mul3NonNeg returns (x * y * z), unless at least one argument is negative or
@@ -2633,7 +2642,7 @@ test "Mul64" {
     }
 }
 
-fn cmp(cm: Color.Model, c0: Color, c1: Color) bool {
+fn cmp(cm: Image, c0: Color, c1: Color) bool {
     // std.debug.print("\nc0={any} c1={any}\n", .{ c0, c1 });
     const v0 = cm.convert(c0).toValue();
     const v1 = cm.convert(c1).toValue();
@@ -2709,20 +2718,20 @@ test "Image" {
 
         const r = Rectangle.init(0, 0, 10, 10);
         try testing.expect(r.eq(m.bounds()));
-        try testing.expect(cmp(m.colorModel(), Color.Transparent, m.at(6, 3)));
+        try testing.expect(cmp(m, Color.Transparent, m.at(6, 3)));
 
         m.set(6, 3, Color.Opaque);
-        try testing.expect(cmp(m.colorModel(), Color.Opaque, m.at(6, 3)));
+        try testing.expect(cmp(m, Color.Opaque, m.at(6, 3)));
 
         try testing.expect(m.subImage(Rectangle.rect(6, 3, 7, 4)).?.@"opaque"());
 
         const m2 = m.subImage(Rectangle.rect(3, 2, 9, 8)).?;
         try testing.expect(Rectangle.rect(3, 2, 9, 8).eq(m2.bounds()));
 
-        try testing.expect(cmp(m2.colorModel(), Color.Opaque, m2.at(6, 3)));
-        try testing.expect(cmp(m2.colorModel(), Color.Transparent, m2.at(3, 3)));
+        try testing.expect(cmp(m2, Color.Opaque, m2.at(6, 3)));
+        try testing.expect(cmp(m2, Color.Transparent, m2.at(3, 3)));
         m2.set(3, 3, Color.Opaque);
-        try testing.expect(cmp(m2.colorModel(), Color.Opaque, m2.at(3, 3)));
+        try testing.expect(cmp(m2, Color.Opaque, m2.at(3, 3)));
 
         _ = m2.subImage(Rectangle.rect(0, 0, 0, 0));
         _ = m2.subImage(Rectangle.rect(10, 0, 10, 0));
