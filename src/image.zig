@@ -757,7 +757,7 @@ test "sqDiff" {
         for (kases) |y| {
             const got = Color.sqDiff(x, y);
             const want = ts.orig(x, y);
-            testing.expectEqual(want, got);
+            try testing.expectEqual(want, got);
         }
     }
 }
@@ -780,7 +780,7 @@ test "TestYCbCrRoundtrip" {
                     ytest.delta(o.b, v1.b) > 2)
                 {
                     print("{any} {any} {any}", .{ v0, o, v1 });
-                    testing.expectEqual(o, v1);
+                    try testing.expectEqual(o, v1);
                 }
             }
         }
@@ -811,7 +811,7 @@ test "TestYCbCrToRGBConsistency" {
                 };
                 const v2 = Color.yCbCrToRGB(o);
                 // print("{any} {any} {any}", .{ v0, v1, v2 });
-                testing.expectEqual(v1, v2);
+                try testing.expectEqual(v1, v2);
             }
         }
     }
@@ -833,7 +833,7 @@ test "TestYCbCrGray" {
                 .y = @intCast(u8, i),
             },
         };
-        ytest.eq(c0, c1);
+        try ytest.eq(c0, c1);
     }
 }
 
@@ -856,7 +856,7 @@ test "TestNYCbCrAAlpha" {
                 .a = @intCast(u8, i),
             },
         };
-        ytest.eq(c0, c1);
+        try ytest.eq(c0, c1);
     }
 }
 
@@ -881,7 +881,7 @@ test "TestNYCbCrAYCbCr" {
                 .cr = 0xc0,
             },
         };
-        ytest.eq(c0, c1);
+        try ytest.eq(c0, c1);
     }
 }
 const ytest = struct {
@@ -892,8 +892,8 @@ const ytest = struct {
         return y - x;
     }
 
-    fn eq(c0: Color, c1: Color) void {
-        testing.expectEqual(c0.toValue(), c1.toValue());
+    fn eq(c0: Color, c1: Color) !void {
+        try testing.expectEqual(c0.toValue(), c1.toValue());
     }
 };
 test "TestCMYKRoundtrip" {
@@ -916,7 +916,7 @@ test "TestCMYKRoundtrip" {
                     ytest.delta(v0.g, v2.g) > 1 or
                     ytest.delta(v0.g, v2.g) > 1)
                 {
-                    testing.expectEqual(v0, v2);
+                    try testing.expectEqual(v0, v2);
                 }
             }
         }
@@ -948,7 +948,7 @@ test "TestCMYKToRGBConsistency" {
                         .b = @truncate(u8, v1.b >> 8),
                     };
                     const v3 = Color.cmykToRGB(v0);
-                    testing.expectEqual(v2, v3);
+                    try testing.expectEqual(v2, v3);
                 }
             }
         }
@@ -972,7 +972,7 @@ test "TestCMYKGray" {
                 .y = @intCast(u8, i),
             },
         };
-        ytest.eq(v0, v1);
+        try ytest.eq(v0, v1);
     }
 }
 
@@ -1032,7 +1032,7 @@ test "TestPalette" {
     };
     for (p.colors) |c, i| {
         const j = p.index(c);
-        testing.expectEqual(i, j);
+        try testing.expectEqual(i, j);
     }
     const got = p.convert(Color{
         .rgba = .{
@@ -1050,7 +1050,7 @@ test "TestPalette" {
             .a = 0x7f,
         },
     };
-    ytest.eq(want, got.?);
+    try ytest.eq(want, got.?);
 }
 
 pub const Config = struct {
@@ -1360,17 +1360,17 @@ test "Rectangle" {
         for (rectangles) |s| {
             const got = r.eq(s);
             const want = check.in(r, s) and check.in(s, r);
-            testing.expectEqual(got, want);
+            try testing.expectEqual(got, want);
         }
     }
     for (rectangles) |r| {
         for (rectangles) |s| {
             const a = r.intersect(s);
-            testing.expect(check.in(a, r));
-            testing.expect(check.in(a, s));
+            try testing.expect(check.in(a, r));
+            try testing.expect(check.in(a, s));
             const is_zero = a.eq(Rectangle.zero());
             const overlaps = r.overlaps(s);
-            testing.expect(is_zero != overlaps);
+            try testing.expect(is_zero != overlaps);
             const larger_than_a = [_]Rectangle{
                 Rectangle.init(
                     a.min.x - 1,
@@ -1401,7 +1401,7 @@ test "Rectangle" {
                 if (b.empty()) {
                     continue;
                 }
-                testing.expect(!(check.in(b, r) and check.in(b, s)));
+                try testing.expect(!(check.in(b, r) and check.in(b, s)));
             }
         }
     }
@@ -1409,8 +1409,8 @@ test "Rectangle" {
     for (rectangles) |r| {
         for (rectangles) |s| {
             const a = r.runion(s);
-            testing.expect(check.in(r, a));
-            testing.expect(check.in(s, a));
+            try testing.expect(check.in(r, a));
+            try testing.expect(check.in(s, a));
             if (a.empty()) {
                 continue;
             }
@@ -1441,7 +1441,7 @@ test "Rectangle" {
                 ),
             };
             for (smaller_than_a) |b| {
-                testing.expect(!(check.in(r, b) and check.in(s, b)));
+                try testing.expect(!(check.in(r, b) and check.in(s, b)));
             }
         }
     }
@@ -2525,13 +2525,13 @@ test "Mul64" {
     };
     for (kases) |v, i| {
         const r = mul64(v.x, v.y);
-        testing.expectEqual(r, v.want);
+        try testing.expectEqual(r, v.want);
     }
 
     // symetric
     for (kases) |v, i| {
         const r = mul64(v.y, v.x);
-        testing.expectEqual(r, v.want);
+        try testing.expectEqual(r, v.want);
     }
 }
 
@@ -2610,21 +2610,21 @@ test "Image" {
         const m = try tc.init();
 
         const r = Rectangle.init(0, 0, 10, 10);
-        testing.expect(r.eq(m.bounds()));
-        testing.expect(cmp(m.colorModel(), Color.Transparent, m.at(6, 3)));
+        try testing.expect(r.eq(m.bounds()));
+        try testing.expect(cmp(m.colorModel(), Color.Transparent, m.at(6, 3)));
 
         m.set(6, 3, Color.Opaque);
-        testing.expect(cmp(m.colorModel(), Color.Opaque, m.at(6, 3)));
+        try testing.expect(cmp(m.colorModel(), Color.Opaque, m.at(6, 3)));
 
-        testing.expect(m.subImage(Rectangle.rect(6, 3, 7, 4)).?.@"opaque"());
+        try testing.expect(m.subImage(Rectangle.rect(6, 3, 7, 4)).?.@"opaque"());
 
         const m2 = m.subImage(Rectangle.rect(3, 2, 9, 8)).?;
-        testing.expect(Rectangle.rect(3, 2, 9, 8).eq(m2.bounds()));
+        try testing.expect(Rectangle.rect(3, 2, 9, 8).eq(m2.bounds()));
 
-        testing.expect(cmp(m2.colorModel(), Color.Opaque, m2.at(6, 3)));
-        testing.expect(cmp(m2.colorModel(), Color.Transparent, m2.at(3, 3)));
+        try testing.expect(cmp(m2.colorModel(), Color.Opaque, m2.at(6, 3)));
+        try testing.expect(cmp(m2.colorModel(), Color.Transparent, m2.at(3, 3)));
         m2.set(3, 3, Color.Opaque);
-        testing.expect(cmp(m2.colorModel(), Color.Opaque, m2.at(3, 3)));
+        try testing.expect(cmp(m2.colorModel(), Color.Opaque, m2.at(3, 3)));
 
         _ = m2.subImage(Rectangle.rect(0, 0, 0, 0));
         _ = m2.subImage(Rectangle.rect(10, 0, 10, 0));
@@ -2692,7 +2692,7 @@ fn testYCrBrColor(r: Rectangle, ratio: Image.YCbCr.SusampleRatio, delta: Point) 
 
     // Test that the image buffer is reasonably small even if (delta.X, delta.Y)
     // is far from the origin.
-    testing.expect(m.y.len < (100 * 100));
+    try testing.expect(m.y.len < (100 * 100));
 
     // Initialize m's pixels. For 422 and 420 subsampling, some of the Cb and Cr elements
     // will be set multiple times. That's OK. We just want to avoid a uniform image.
@@ -2727,7 +2727,7 @@ fn testYCrBrColor(r: Rectangle, ratio: Image.YCbCr.SusampleRatio, delta: Point) 
                         while (x < sub.rect.max.x) : (x += 1) {
                             const c0 = m.at(x, yn);
                             const c1 = sub.at(x, yn);
-                            testing.expectEqual(c0.toValue(), c1.toValue());
+                            try testing.expectEqual(c0.toValue(), c1.toValue());
                         }
                     }
                 }
