@@ -47,8 +47,6 @@ pub const Color = union(enum) {
     };
 
     pub const Model = struct {
-        convert: fn (c: Color) Color,
-
         pub fn rgba(m: Color) Color {
             return switch (m) {
                 .rgba => m,
@@ -437,17 +435,17 @@ pub const Color = union(enum) {
         }
     };
 
-    pub const RGBAModel = Model{ .convert = Model.rgba };
-    pub const RGBA64Model = Model{ .convert = Model.rgba64 };
-    pub const NRGBAModel = Model{ .convert = Model.nrgba };
-    pub const NRGBA64Model = Model{ .convert = Model.nrgba64 };
-    pub const AlphaModel = Model{ .convert = Model.alpha };
-    pub const Alpha16Model = Model{ .convert = Model.alpha16 };
-    pub const GrayModel = Model{ .convert = Model.gray };
-    pub const Gray16Model = Model{ .convert = Model.gray16 };
-    pub const YCbCrModel = Model{ .convert = Model.yCbCr };
-    pub const NYCbCrAModel = Model{ .convert = Model.nYCbCrA };
-    pub const CMYKModel = Model{ .convert = Model.cmyk };
+    pub const RGBAModel = Model.rgba;
+    pub const RGBA64Model = Model.rgba64;
+    pub const NRGBAModel = Model.nrgba;
+    pub const NRGBA64Model = Model.nrgba64;
+    pub const AlphaModel = Model.alpha;
+    pub const Alpha16Model = Model.alpha16;
+    pub const GrayModel = Model.gray;
+    pub const Gray16Model = Model.gray16;
+    pub const YCbCrModel = Model.yCbCr;
+    pub const NYCbCrAModel = Model.nYCbCrA;
+    pub const CMYKModel = Model.cmyk;
 
     pub const Black = Color{ .gray = Gray{ .y = 0 } };
     pub const White = Color{ .gray = Gray{ .y = 0xffff } };
@@ -1470,17 +1468,17 @@ pub const Image = union(enum) {
 
     pub fn convert(self: Image, c: Color) Color {
         return switch (self) {
-            .rgba => Color.RGBAModel.convert(c),
-            .rgba64 => Color.RGBA64Model.convert(c),
-            .nrgba => Color.RGBA64Model.convert(c),
-            .nrgba64 => Color.NRGBA64Model.convert(c),
-            .alpha => Color.AlphaModel.convert(c),
-            .alpha16 => Color.Alpha16Model.convert(c),
-            .gray => Color.GrayModel.convert(c),
-            .gray16 => Color.Gray16Model.convert(c),
-            .cmyk => Color.CMYKModel.convert(c),
-            .yCbCr => Color.YCbCrModel.convert(c),
-            .nYCbCrA => Color.NYCbCrAModel.convert(c),
+            .rgba => Color.RGBAModel(c),
+            .rgba64 => Color.RGBA64Model(c),
+            .nrgba => Color.RGBA64Model(c),
+            .nrgba64 => Color.NRGBA64Model(c),
+            .alpha => Color.AlphaModel(c),
+            .alpha16 => Color.Alpha16Model(c),
+            .gray => Color.GrayModel(c),
+            .gray16 => Color.Gray16Model(c),
+            .cmyk => Color.CMYKModel(c),
+            .yCbCr => Color.YCbCrModel(c),
+            .nYCbCrA => Color.NYCbCrAModel(c),
         };
     }
 
@@ -1646,7 +1644,7 @@ pub const Image = union(enum) {
             const point = Point{ .x = x, .y = y };
             if (point.in(self.rect)) {
                 const i = self.pixOffset(x, y);
-                const c1 = Color.RGBAModel.convert(c).toValue();
+                const c1 = Color.RGBAModel(c).toValue();
                 const s = self.pix[i .. i + 4];
                 s[0] = @truncate(u8, c1.r);
                 s[1] = @truncate(u8, c1.g);
@@ -1771,7 +1769,7 @@ pub const Image = union(enum) {
             const point = Point{ .x = x, .y = y };
             if (point.in(self.rect)) {
                 const i = self.pixOffset(x, y);
-                const c1 = Color.RGBA64Model.convert(c).toValue();
+                const c1 = Color.RGBA64Model(c).toValue();
                 var s = self.pix[i .. i + 8];
                 s[0] = @truncate(u8, c1.r >> 8);
                 s[1] = @truncate(u8, c1.r);
@@ -1848,7 +1846,7 @@ pub const Image = union(enum) {
             const point = Point{ .x = x, .y = y };
             if (point.in(self.rect)) {
                 const i = self.pixOffset(x, y);
-                const c1 = Color.NRGBAModel.convert(c).toValue();
+                const c1 = Color.NRGBAModel(c).toValue();
                 var s = self.pix[i .. i + 4];
                 s[0] = @truncate(u8, c1.r);
                 s[1] = @truncate(u8, c1.g);
@@ -1930,7 +1928,7 @@ pub const Image = union(enum) {
             const point = Point{ .x = x, .y = y };
             if (point.in(self.rect)) {
                 const i = self.pixOffset(x, y);
-                const c1 = Color.NRGBA64Model.convert(c).toValue();
+                const c1 = Color.NRGBA64Model(c).toValue();
                 var s = self.pix[i .. i + 8];
                 s[0] = @truncate(u8, c1.r >> 8);
                 s[1] = @truncate(u8, c1.r);
@@ -2008,7 +2006,7 @@ pub const Image = union(enum) {
             const point = Point{ .x = x, .y = y };
             if (point.in(self.rect)) {
                 const i = self.pixOffset(x, y);
-                self.pix[i] = Color.AlphaModel.convert(c).alpha.a;
+                self.pix[i] = Color.AlphaModel(c).alpha.a;
             }
         }
 
@@ -2077,7 +2075,7 @@ pub const Image = union(enum) {
             const point = Point{ .x = x, .y = y };
             if (point.in(self.rect)) {
                 const i = self.pixOffset(x, y);
-                const c1 = Color.Alpha16Model.convert(c).alpha16;
+                const c1 = Color.Alpha16Model(c).alpha16;
                 self.pix[i + 0] = @truncate(u8, c1.a >> 8);
                 self.pix[i + 1] = @truncate(u8, c1.a);
             }
@@ -2148,7 +2146,7 @@ pub const Image = union(enum) {
             const point = Point{ .x = x, .y = y };
             if (point.in(self.rect)) {
                 const i = self.pixOffset(x, y);
-                self.pix[i] = Color.GrayModel.convert(c).gray.y;
+                self.pix[i] = Color.GrayModel(c).gray.y;
             }
         }
 
@@ -2201,7 +2199,7 @@ pub const Image = union(enum) {
             const point = Point{ .x = x, .y = y };
             if (point.in(self.rect)) {
                 const i = self.pixOffset(x, y);
-                const c1 = Color.Gray16Model.convert(c).gray16;
+                const c1 = Color.Gray16Model(c).gray16;
                 self.pix[i + 0] = @truncate(u8, c1.y >> 8);
                 self.pix[i + 1] = @truncate(u8, c1.y);
             }
@@ -2262,7 +2260,7 @@ pub const Image = union(enum) {
             const point = Point{ .x = x, .y = y };
             if (point.in(self.rect)) {
                 const i = self.pixOffset(x, y);
-                const c1 = Color.CMYKModel.convert(c).cMYK;
+                const c1 = Color.CMYKModel(c).cMYK;
                 var s = self.pix[i .. i + 4];
                 s[0] = c1.c;
                 s[1] = c1.y;
