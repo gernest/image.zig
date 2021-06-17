@@ -238,10 +238,12 @@ pub const Color = union(enum) {
 
         pub fn nYCbCrAModel(m: Color) Color {
             return switch (m) {
-                .yYCbCrA => m,
-                .yCbCr => |c| NYCbCrA{
-                    .y = c,
-                    .a = 0xff,
+                .nYCbCrA => m,
+                .yCbCr => |c| .{
+                    .nYCbCrA = .{
+                        .y = c,
+                        .a = 0xff,
+                    },
                 },
                 else => {
                     var v = m.toValue();
@@ -250,11 +252,17 @@ pub const Color = union(enum) {
                         v.g = @divTrunc(v.g * 0xffff, v.a);
                         v.b = @divTrunc(v.b * 0xffff, v.a);
                     }
-                    const y = rgbToYCbCr(
-                        @intCast(u8, v.r >> 8),
-                        @intCast(u8, v.g >> 8),
-                        @intCast(u8, v.b >> 8),
-                    );
+                    const y = rgbToYCbCr(.{
+                        .r = @intCast(u8, v.r >> 8),
+                        .g = @intCast(u8, v.g >> 8),
+                        .b = @intCast(u8, v.b >> 8),
+                    });
+                    return Color{
+                        .nYCbCrA = .{
+                            .y = y,
+                            .a = @intCast(u8, v.a >> 8),
+                        },
+                    };
                 },
             };
         }
@@ -533,8 +541,8 @@ pub const Color = union(enum) {
     };
 
     const NYCbCrA = struct {
-        y: YCbCr,
-        a: u8,
+        y: YCbCr = .{},
+        a: u8 = 0,
 
         pub fn toValue(self: NYCbCrA) Value {
             var yy1 = @intCast(i32, self.y.y) * 0x10101;
@@ -1458,6 +1466,7 @@ pub const Image = union(enum) {
     gray16: Gray16,
     cmyk: CMYK,
     yCbCr: YCbCr,
+    nYCbCrA: NYCbCrA,
 
     pub fn colorModel(self: Image) Color.Model {
         return switch (self) {
@@ -1471,6 +1480,7 @@ pub const Image = union(enum) {
             .gray16 => Color.Gray16Model,
             .cmyk => Color.CMYKModel,
             .yCbCr => Color.YCbCrModel,
+            .nYCbCrA => Color.NYCbCrAModel,
         };
     }
 
@@ -1486,6 +1496,7 @@ pub const Image = union(enum) {
             .gray16 => |i| i.rect,
             .cmyk => |i| i.rect,
             .yCbCr => |i| i.rect,
+            .nYCbCrA => |i| i.y.rect,
         };
     }
 
@@ -1502,7 +1513,7 @@ pub const Image = union(enum) {
             .gray => |i| i.pix,
             .gray16 => |i| i.pix,
             .cmyk => |i| i.pix,
-            .yCbCr => unreachable,
+            else => unreachable,
         };
     }
 
@@ -1518,6 +1529,7 @@ pub const Image = union(enum) {
             .gray16 => |i| i.at(x, y),
             .cmyk => |i| i.at(x, y),
             .yCbCr => |i| i.at(x, y),
+            .nYCbCrA => |i| i.at(x, y),
         };
     }
 
@@ -1532,7 +1544,7 @@ pub const Image = union(enum) {
             .gray => |i| i.set(x, y, c),
             .gray16 => |i| i.set(x, y, c),
             .cmyk => |i| i.set(x, y, c),
-            .yCbCr => unreachable,
+            else => unreachable,
         }
     }
 
@@ -1548,6 +1560,7 @@ pub const Image = union(enum) {
             .gray16 => |i| i.subImage(r),
             .cmyk => |i| i.subImage(r),
             .yCbCr => |i| i.subImage(r),
+            .nYCbCrA => |i| i.subImage(r),
         };
     }
 
@@ -1562,7 +1575,8 @@ pub const Image = union(enum) {
             .gray => |i| i.@"opaque"(),
             .gray16 => |i| i.@"opaque"(),
             .cmyk => |i| i.@"opaque"(),
-            .yCbCr => unreachable,
+            .yCbCr => |i| i.@"opaque"(),
+            .nYCbCrA => |i| i.@"opaque"(),
         };
     }
 
@@ -2278,12 +2292,12 @@ pub const Image = union(enum) {
         y: []u8 = undefined,
         cb: []u8 = undefined,
         cr: []u8 = undefined,
-        sub_sample_ration: SusampleRatio = .Ratio444,
+        sub_sample_ration: SampleRatio = .Ratio444,
         ystride: isize = 0,
         cstride: isize = 0,
         rect: Rectangle = Rectangle.zero(),
 
-        const SusampleRatio = enum {
+        pub const SampleRatio = enum {
             Ratio444,
             Ratio422,
             Ratio420,
@@ -2292,7 +2306,7 @@ pub const Image = union(enum) {
             Ratio410,
         };
 
-        pub fn init(a: *std.mem.Allocator, r: Rectangle, ratio: SusampleRatio) !YCbCr {
+        pub fn init(a: *std.mem.Allocator, r: Rectangle, ratio: SampleRatio) !YCbCr {
             const x = yCbCrSize(r, ratio);
             const total_length = add2NonNeg(
                 mul3NonNeg(1, x.w, x.h),
@@ -2397,7 +2411,7 @@ pub const Image = union(enum) {
             ch: isize,
         };
 
-        fn yCbCrSize(r: Rectangle, ratio: SusampleRatio) yrs {
+        pub fn yCbCrSize(r: Rectangle, ratio: SampleRatio) yrs {
             const w = r.dx();
             const h = r.dy();
             var x = yrs{
@@ -2437,9 +2451,93 @@ pub const Image = union(enum) {
     };
 
     pub const NYCbCrA = struct {
-        pix: []u8,
-        stride: isize,
-        rect: Rectangle,
+        y: YCbCr,
+        pix: []u8 = undefined,
+        a: []u8 = undefined,
+        astride: isize = 0,
+
+        pub fn init(a: *std.mem.Allocator, r: Rectangle, ratio: YCbCr.SampleRatio) !NYCbCrA {
+            const x = YCbCr.yCbCrSize(r, ratio);
+            const total_length = add2NonNeg(mul3NonNeg(2, x.w, x.h), mul3NonNeg(2, x.cw, x.ch));
+            if (total_length < 0) return error.RectangleHugeOrNegativeDimension;
+
+            const i_0 = @intCast(usize, 1 * x.w * x.h + 0 * x.cw * x.ch);
+            const i_1 = @intCast(usize, 1 * x.w * x.h + 1 * x.cw * x.ch);
+            const i_2 = @intCast(usize, 1 * x.w * x.h + 2 * x.cw * x.ch);
+            const i_3 = @intCast(usize, 2 * x.w * x.h + 2 * x.cw * x.ch);
+            var b = try a.alloc(u8, i_3);
+            return NYCbCrA{
+                .y = .{
+                    .y = b[0..i_0],
+                    .cb = b[i_0..i_1],
+                    .cr = b[i_1..i_2],
+                    .sub_sample_ration = ratio,
+                    .ystride = x.w,
+                    .cstride = x.h,
+                    .rect = r,
+                },
+                .a = b[i_2..],
+                .astride = x.w,
+            };
+        }
+
+        pub fn at(self: NYCbCrA, x: isize, y: isize) Color {
+            const point = Point{ .x = x, .y = y };
+            if (!point.in(self.y.rect)) return Color{
+                .nYCbCrA = .{},
+            };
+            const yi = self.y.yOffset(x, y);
+            const ci = self.y.cOffset(x, y);
+            const ai = self.aOffset(x, y);
+            return Color{
+                .nYCbCrA = .{
+                    .y = .{
+                        .y = self.y.y[yi],
+                        .cb = self.y.cb[ci],
+                        .cr = self.y.cr[ci],
+                    },
+                    .a = self.a[ai],
+                },
+            };
+        }
+
+        pub fn aOffset(self: NYCbCrA, x: isize, y: isize) usize {
+            const v = (y - self.y.rect.min.y) * self.astride + (x - self.y.rect.min.x);
+            return std.math.absCast(v);
+        }
+
+        pub fn subImage(self: NYCbCrA, n: Rectangle) ?Image {
+            const r = n.intersect(self.y.rect);
+            if (r.empty()) return Image{
+                .nYCbCrA = .{
+                    .y = .{
+                        .sub_sample_ration = self.y.sub_sample_ration,
+                    },
+                },
+            };
+            const yi = self.y.yOffset(r.min.x, r.min.y);
+            const ci = self.y.cOffset(r.min.x, r.min.y);
+            const ai = self.aOffset(r.min.x, r.min.y);
+            return Image{
+                .nYCbCrA = .{
+                    .y = YCbCr{
+                        .y = self.y.y[yi..],
+                        .cb = self.y.cb[ci..],
+                        .cr = self.y.cr[ci..],
+                        .sub_sample_ration = self.y.sub_sample_ration,
+                        .ystride = self.y.ystride,
+                        .cstride = self.y.cstride,
+                        .rect = r,
+                    },
+                    .a = self.a[ai..],
+                    .astride = self.astride,
+                },
+            };
+        }
+
+        pub fn @"opaque"(self: NYCbCrA) bool {
+            return true;
+        }
     };
 };
 
@@ -2658,7 +2756,7 @@ test "TestYCbCr" {
         Rectangle.rect(10, 10, 17, 17),
     };
 
-    const sample_rations = [_]Image.YCbCr.SusampleRatio{
+    const sample_rations = [_]Image.YCbCr.SampleRatio{
         .Ratio444,
         .Ratio422,
         .Ratio420,
@@ -2683,7 +2781,7 @@ test "TestYCbCr" {
     }
 }
 
-fn testYCrBrColor(r: Rectangle, ratio: Image.YCbCr.SusampleRatio, delta: Point) !void {
+fn testYCrBrColor(r: Rectangle, ratio: Image.YCbCr.SampleRatio, delta: Point) !void {
     const r1 = r.add(delta);
     var a = std.heap.ArenaAllocator.init(testing.allocator);
     defer a.deinit();
