@@ -2549,6 +2549,15 @@ pub const Image = union(enum) {
         rect: Rectangle,
         palette: Color.Palette,
 
+        pub fn init(a: *std.mem.Allocator, r: Rectangle, p: Color.Palette) !Paletted {
+            return Paletted{
+                .pix = try createPix(a, 1, r, "Paletted"),
+                .stride = 1 * r.dx(),
+                .rect = r,
+                .palette = p,
+            };
+        }
+
         pub fn pixOffset(self: Paletted, x: isize, y: isize) usize {
             const v = (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 1;
             return @intCast(usize, v);
