@@ -1467,7 +1467,7 @@ pub const Image = union(enum) {
     nYCbCrA: NYCbCrA,
     paletted: Paletted,
 
-    pub fn convert(self: Image, c: Color) Color {
+    pub fn convert(self: Image, c: Color) ?Color {
         return switch (self) {
             .rgba => Color.RGBAModel(c),
             .rgba64 => Color.RGBA64Model(c),
@@ -1518,7 +1518,7 @@ pub const Image = union(enum) {
         };
     }
 
-    pub fn at(self: Image, x: isize, y: isize) Color {
+    pub fn at(self: Image, x: isize, y: isize) ?Color {
         return switch (self) {
             .rgba => |i| i.at(x, y),
             .rgba64 => |i| i.at(x, y),
@@ -1531,6 +1531,7 @@ pub const Image = union(enum) {
             .cmyk => |i| i.at(x, y),
             .yCbCr => |i| i.at(x, y),
             .nYCbCrA => |i| i.at(x, y),
+            .paletted => |i| i.at(x, y),
         };
     }
 
@@ -1545,6 +1546,7 @@ pub const Image = union(enum) {
             .gray => |i| i.set(x, y, c),
             .gray16 => |i| i.set(x, y, c),
             .cmyk => |i| i.set(x, y, c),
+            .paletted => |i| i.set(x, y, c),
             else => unreachable,
         }
     }
@@ -1562,6 +1564,7 @@ pub const Image = union(enum) {
             .cmyk => |i| i.subImage(r),
             .yCbCr => |i| i.subImage(r),
             .nYCbCrA => |i| i.subImage(r),
+            .paletted => |i| i.subImage(r),
         };
     }
 
@@ -1578,6 +1581,7 @@ pub const Image = union(enum) {
             .cmyk => |i| i.@"opaque"(),
             .yCbCr => |i| i.@"opaque"(),
             .nYCbCrA => |i| i.@"opaque"(),
+            .paletted => |i| i.@"opaque"(),
         };
     }
 
@@ -2563,12 +2567,12 @@ pub const Image = union(enum) {
             return @intCast(usize, v);
         }
 
-        pub fn at(self: Paletted, x: isize, y: isize) Color {
+        pub fn at(self: Paletted, x: isize, y: isize) ?Color {
             const point = Point{ .x = x, .y = y };
             if (!point.in(self.rect)) return null;
             const i = self.pixOffset(x, y);
             const s = self.pix[i .. i + 4];
-            return self.palette[@intCast(usize, self.pix[i])];
+            return self.palette.colors[@intCast(usize, self.pix[i])];
         }
 
         pub fn set(self: Paletted, x: isize, y: isize, c: Color) void {
@@ -2588,7 +2592,7 @@ pub const Image = union(enum) {
                     .pix = self.pix[i..],
                     .stride = self.stride,
                     .rect = self.rect.intersect(r),
-                    .palette = sel.palette,
+                    .palette = self.palette,
                 },
             };
         }
@@ -2609,8 +2613,8 @@ pub const Image = union(enum) {
                 i_0 += self.stride;
                 i_1 += self.stride;
             }
-            for (self.palette.colors) |c, i| {
-                if (!present[i]) continue;
+            for (self.palette.colors) |c, x| {
+                if (!present[x]) continue;
                 const v = c.toValue();
                 if (v.a != 0xffff) return false;
             }
@@ -2711,10 +2715,10 @@ test "Mul64" {
     }
 }
 
-fn cmp(cm: Image, c0: Color, c1: Color) bool {
+fn cmp(cm: Image, c0: ?Color, c1: ?Color) bool {
     // std.debug.print("\nc0={any} c1={any}\n", .{ c0, c1 });
-    const v0 = cm.convert(c0).toValue();
-    const v1 = cm.convert(c1).toValue();
+    const v0 = cm.convert(c0.?).?.toValue();
+    const v1 = cm.convert(c1.?).?.toValue();
     // std.debug.print("\nv0={any} v1={any}\n", .{ v0, v1 });
     return v0.eq(v1);
 }
