@@ -1465,6 +1465,7 @@ pub const Image = union(enum) {
     cmyk: CMYK,
     yCbCr: YCbCr,
     nYCbCrA: NYCbCrA,
+    paletted: Paletted,
 
     pub fn convert(self: Image, c: Color) Color {
         return switch (self) {
@@ -1479,6 +1480,7 @@ pub const Image = union(enum) {
             .cmyk => Color.CMYKModel(c),
             .yCbCr => Color.YCbCrModel(c),
             .nYCbCrA => Color.NYCbCrAModel(c),
+            .paletted => |p| p.palette.convert(c),
         };
     }
 
@@ -1495,6 +1497,7 @@ pub const Image = union(enum) {
             .cmyk => |i| i.rect,
             .yCbCr => |i| i.rect,
             .nYCbCrA => |i| i.y.rect,
+            .paletted => |i| i.rect,
         };
     }
 
@@ -2544,7 +2547,66 @@ pub const Image = union(enum) {
         pix: []u8,
         stride: isize,
         rect: Rectangle,
-        palete: Color.Palette,
+        palette: Color.Palette,
+
+        pub fn pixOffset(self: Paletted, x: isize, y: isize) usize {
+            const v = (y - self.rect.min.y) * self.stride + (x - self.rect.min.x) * 1;
+            return @intCast(usize, v);
+        }
+
+        pub fn at(self: Paletted, x: isize, y: isize) Color {
+            const point = Point{ .x = x, .y = y };
+            if (!point.in(self.rect)) return null;
+            const i = self.pixOffset(x, y);
+            const s = self.pix[i .. i + 4];
+            return self.palette[@intCast(usize, self.pix[i])];
+        }
+
+        pub fn set(self: Paletted, x: isize, y: isize, c: Color) void {
+            const point = Point{ .x = x, .y = y };
+            if (point.in(self.rect)) {
+                const i = self.pixOffset(x, y);
+                self.pix[i] = @truncate(u8, self.palette.index(c));
+            }
+        }
+
+        pub fn subImage(self: Paletted, r: Rectangle) ?Image {
+            const n = r.intersect(self.rect);
+            if (r.empty()) return null;
+            const i = self.pixOffset(n.min.x, n.min.y);
+            return Image{
+                .paletted = .{
+                    .pix = self.pix[i..],
+                    .stride = self.stride,
+                    .rect = self.rect.intersect(r),
+                    .palette = sel.palette,
+                },
+            };
+        }
+
+        pub fn @"opaque"(self: Paletted) bool {
+            var present: [256]bool = undefined;
+            var i: usize = 0;
+            while (i < present.len) : (i += 1) {
+                present[i] = false;
+            }
+            var i_0: isize = 0;
+            var i_1: isize = self.rect.dx();
+            var y: isize = self.rect.min.y;
+            while (y < self.rect.max.y) : (y += 1) {
+                for (self.pix[@intCast(usize, i_0)..@intCast(usize, i_1)]) |c| {
+                    present[@intCast(usize, c)] = true;
+                }
+                i_0 += self.stride;
+                i_1 += self.stride;
+            }
+            for (self.palette.colors) |c, i| {
+                if (!present[i]) continue;
+                const v = c.toValue();
+                if (v.a != 0xffff) return false;
+            }
+            return false;
+        }
     };
 };
 
