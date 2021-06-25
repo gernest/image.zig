@@ -540,11 +540,13 @@ fn PNGReader(comptime ReaderType: type) type {
             var pix_offset: usize = 0;
             var gray: ?image.Image.Gray = null;
             var rgba: ?image.Image.RGBA = null;
-            // var palleted: ?image.Image.Palleted = null;
+            var palleted: ?image.Image.Palleted = null;
             var nrgba: ?image.Image.NRGBA = null;
             var gray16: ?image.Image.Gray16 = null;
             var rgba64: ?image.Image.RGBA64 = null;
             var nrgba64: ?image.Image.NRGBA64 = null;
+            var img: ?image.Image = null;
+
             var width = self.width;
             var height = self.height;
             if (self.interlace == .Adam7 and !allocate_only) {
@@ -574,12 +576,34 @@ fn PNGReader(comptime ReaderType: type) type {
                 },
                 .GA8 => {
                     bits_per_pixel = 16;
-                    nrgba = try image.Image.NRGBA.init(a, image.Rectangle.rect(0, 9, WIDTH, HEIGHT));
+                    nrgba = try image.Image.NRGBA.init(a, image.Rectangle.rect(0, 0, width, height));
                     img = image.Image{
                         .nrgba = nrgba,
                     };
                 },
+                .TC8 => {
+                    bits_per_pixel = 24;
+                    if (self.use_transparent) {
+                        nrgba = try image.Image.NRGBA.init(a, image.Rectangle.rect(0, 0, width, height));
+                        img = image.Image{
+                            .nrgba = nrgba,
+                        };
+                    } else {
+                        rgba = try image.Image.RGBA.init(a, image.Rectangle.rect(0, 0, width, height));
+                        img = image.Image{
+                            .rgba = rgba,
+                        };
+                    }
+                },
+                .P1, .P2, .P4, .P8 => {
+                    bits_per_pixel = self.depth;
+                    palleted = try image.Image.Paletted.init(a, image.Rectangle.rect(0, 0, width, height), self.palette);
+                    img = image.Image{
+                        .paletted = palleted,
+                    };
+                },
             }
+            return img;
         }
     };
 }
