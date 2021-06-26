@@ -9,10 +9,17 @@ global: *mem.Allocator,
 
 const Self = @This();
 
-fn ga(self: *Self) *mem.Allocator {
+pub fn init(a: *mem.Allocator) Self {
+    return .{
+        .arena_allocator = heap.ArenaAllocator.init(a),
+        .global = a,
+    };
+}
+
+pub fn ga(self: *Self) *mem.Allocator {
     return self.global;
 }
 
-fn arena(self: *Self) *mem.Allocator {
+pub fn arena(self: *Self) *mem.Allocator {
     return &self.arena_allocator.allocator;
 }

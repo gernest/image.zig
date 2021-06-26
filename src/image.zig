@@ -1585,31 +1585,6 @@ pub const Image = union(enum) {
         };
     }
 
-    pub fn luminance(self: Image, a: *std.mem.Allocator) !Luminance {
-        const b = self.bounds();
-        const height = b.dx();
-        const width = b.dy();
-        var lu = try a.alloc(u8, height * width);
-        var index: isize = 0;
-        var y: isize = b.min.Y;
-        while (y < b.max.y) : (y += 1) {
-            var x = b.min.x;
-            while (x < b.max.x) : (x += 1) {
-                const c = self.at(x, y).toValue();
-                const lum = (c.r + 2 * c.g + c.b) * 255 / (4 * 0xffff);
-                lu[index] = @intCast(u8, (lum * c.a + (0xffff - c.a) * 255) / 0xffff);
-                index += 1;
-            }
-        }
-        return Luminance{
-            .pix = lu,
-            .dimensions = .{
-                .height = height,
-                .width = width,
-            },
-        };
-    }
-
     pub const RGBA = struct {
         // pix holds the image's pixels, in R, G, B, A order. The pixel at
         // (x, y) starts at pix[(y-Rect.Min.Y)*Stride + (x-Rect.Min.X)*4].
@@ -1691,37 +1666,6 @@ pub const Image = union(enum) {
                 i_1 += self.stride;
             }
             return true;
-        }
-    };
-
-    const Luminance = struct {
-        pix: []const u8,
-        dimension: Dimension = Dimension{},
-        data: Dimension = Dimension{},
-        left: isize,
-        top: isize,
-        pub const Dimension = struct {
-            height: isize = 0,
-            width: isize = 0,
-        };
-
-        pub fn crop(self: Luminance, left: isize, top: isize, width: isize, height: isize) Luminance {
-            if ((left + width > self.data.width) or (top + height > self.data.height)) {
-                std.debug.panic("IllegalArgumentException: Crop rectangle does not fit within image data");
-            }
-            return Luminance{
-                .pix = self.pix,
-                .dimension = .{
-                    .height = height,
-                    .widht = width,
-                },
-                .data = .{
-                    .height = self.height,
-                    .width = self.width,
-                },
-                .left = self.left + left,
-                .top = self.top + top,
-            };
         }
     };
 
