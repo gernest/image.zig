@@ -80,7 +80,7 @@ const RGB = struct {
         };
     }
 
-    pub fn getRow(self: *RGB, y: usize) IllegalArgument![]const u8 {
+    pub fn getRow(self: *const RGB, y: usize) IllegalArgument![]const u8 {
         if (y >= self.dimension.height) return error.RowOutsideOfImage;
         const offset = (y + self.top) * self.data.width + self.left;
         return self.pix[offset .. offset + self.dimension.width];
@@ -115,9 +115,30 @@ const RGB = struct {
     pub fn format(
         self: RGB,
         comptime fmt: []const u8,
-        options: FormatOptions,
+        options: std.fmt.FormatOptions,
         writer: anytype,
-    ) @TypeOf(writer).Error!void {}
+    ) @TypeOf(writer).Error!void {
+        var y: usize = 0;
+        while (y < self.dimension.height) : (y += 1) {
+            const row = self.getRow(y) catch unreachable;
+            var x: usize = 0;
+            while (x < self.dimension.width) : (x += 1) {
+                const luminance = row[x] & 0xFF;
+                var c: u8 = 0;
+                if (luminance < 0x40) {
+                    c = '#';
+                } else if (luminance < 0x80) {
+                    c = '+';
+                } else if (luminance < 0xC0) {
+                    c = '.';
+                } else {
+                    c = ' ';
+                }
+                try writer.writeByte(c);
+            }
+            try writer.writeByte('\n');
+        }
+    }
 };
 
 fn makeRGBLSource(ctx: *Context, width: usize, height: usize) !RGB {
@@ -153,4 +174,24 @@ test "TestRGBLuminanceSource_GetRow" {
     const row9 = try lum.getRow(9);
     const expect9 = [_]u8{ 127, 148, 169, 191, 212, 169, 190, 211, 232, 254 };
     try testing.expectEqualStrings(expect9[0..], row9);
+}
+
+test "TestRGBLuminanceSource_String" {
+    var ctx = Context.init(testing.allocator);
+    var lum = try makeRGBLSource(&ctx, 10, 10);
+    defer ctx.ga().free(lum.pix);
+    const expect = "" ++
+        "####+##+++\n" ++
+        "###++#+++.\n" ++
+        "##++++++..\n" ++
+        "#+++.++...\n" ++
+        "+++..+... \n" ++
+        "##++++++..\n" ++
+        "#+++.++...\n" ++
+        "+++..+... \n" ++
+        "++......  \n" ++
+        "+... ..   \n";
+    const got = try std.fmt.allocPrint(testing.allocator, "{}", .{lum});
+    defer testing.allocator.free(got);
+    try testing.expectEqualStrings(expect, got);
 }
