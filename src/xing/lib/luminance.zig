@@ -6,9 +6,8 @@ const testing = std.testing;
 
 const Context = @import("./memory.zig");
 
-pub const Source = struct {
-    base: Dimesnion,
-};
+rgb: ?RGB,
+kind: enum { RGB, YUV } = .RGB,
 
 const RGB = struct {
     pix: []const u8,
