@@ -6,8 +6,19 @@ const testing = std.testing;
 
 const Context = @import("./memory.zig");
 
-rgb: ?RGB,
-kind: enum { RGB, YUV } = .RGB,
+pub const Source = union(enum) {
+    RGB: RGB,
+};
+
+source: Source,
+
+const Self = @This();
+
+pub fn initFromImage(ctx: *Context, image: image.Image) !Self {
+    return .{ .source = .{
+        .RGB = try RGB.initFromImage(image, ctx.ga()),
+    } };
+}
 
 const RGB = struct {
     pix: []const u8,
@@ -54,17 +65,17 @@ const RGB = struct {
         };
     }
 
-    pub fn initFromImage(self: image.Image, a: *std.mem.Allocator) !RGB {
-        const b = self.bounds();
+    pub fn initFromImage(ctx: *Context, imgg: image.Image) !RGB {
+        const b = imgg.bounds();
         const height = b.dx();
         const width = b.dy();
-        var lu = try a.alloc(u8, height * width);
+        var lu = try ctx.ga().alloc(u8, height * width);
         var index: isize = 0;
         var y: isize = b.min.Y;
         while (y < b.max.y) : (y += 1) {
             var x = b.min.x;
             while (x < b.max.x) : (x += 1) {
-                const c = self.at(x, y).toValue();
+                const c = imgg.at(x, y).toValue();
                 const lum = (c.r + 2 * c.g + c.b) * 255 / (4 * 0xffff);
                 lu[index] = @intCast(u8, (lum * c.a + (0xffff - c.a) * 255) / 0xffff);
                 index += 1;
@@ -76,7 +87,12 @@ const RGB = struct {
                 .height = height,
                 .width = width,
             },
+            .ctx = ctx,
         };
+    }
+
+    pub fn deinit(self: *RGB) void {
+        self.ctx.ga().free(self.pix);
     }
 
     pub fn getRow(self: *const RGB, y: usize) IllegalArgument![]const u8 {
@@ -178,7 +194,8 @@ test "TestRGBLuminanceSource_GetRow" {
 test "TestRGBLuminanceSource_String" {
     var ctx = Context.init(testing.allocator);
     var lum = try makeRGBLSource(&ctx, 10, 10);
-    defer ctx.ga().free(lum.pix);
+    defer lum.deinit();
+
     const expect = "" ++
         "####+##+++\n" ++
         "###++#+++.\n" ++
