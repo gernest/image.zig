@@ -3,4 +3,6 @@ pub const IllegalArgument = error{
     RowOutsideOfImage,
     InsufficientRowCopySize,
     WrongDimension,
+    MismatchInputDimension,
+    UnfitRegion,
 };
