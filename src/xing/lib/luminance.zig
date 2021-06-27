@@ -10,6 +10,11 @@ pub const Source = union(enum) {
     RGB: RGB,
 };
 
+pub const Dimension = struct {
+    height: usize = 0,
+    width: usize = 0,
+};
+
 source: Source,
 
 const Self = @This();
@@ -20,6 +25,18 @@ pub fn initFromImage(ctx: *Context, image: image.Image) !Self {
     } };
 }
 
+pub fn dimesnion(self: *Self) Dimension {
+    return switch (self.source) {
+        .RGB => |s| s.dimension,
+    };
+}
+
+pub fn getRow(self: *Self, y: usize) ![]const u8 {
+    return switch (self.source) {
+        .RGB => |s| return s.getRow(y),
+    };
+}
+
 const RGB = struct {
     pix: []const u8,
     dimension: Dimension = Dimension{},
@@ -28,11 +45,6 @@ const RGB = struct {
     top: usize = 0,
     mode: enum { Normal, Inverted } = .Normal,
     ctx: *Context,
-
-    pub const Dimension = struct {
-        height: usize = 0,
-        width: usize = 0,
-    };
 
     fn init(ctx: *Context, width: usize, height: usize, pix: []usize) !RGB {
         var data_width = width;

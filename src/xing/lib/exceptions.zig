@@ -5,4 +5,5 @@ pub const IllegalArgument = error{
     WrongDimension,
     MismatchInputDimension,
     UnfitRegion,
+    NotFound,
 };
