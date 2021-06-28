@@ -16,6 +16,10 @@ pub fn init(a: *mem.Allocator) Self {
     };
 }
 
+pub fn deinit(self: *Self) void {
+    self.arena_allocator.deinit();
+}
+
 pub fn ga(self: *Self) *mem.Allocator {
     return self.global;
 }
