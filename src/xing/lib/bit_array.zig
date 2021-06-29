@@ -40,6 +40,10 @@ pub fn set(self: *Self, i: usize) void {
     self.bit_set.set(i);
 }
 
+pub fn setBBulk(self: *Self, i: usize, new_bits: usize) void {
+    self.bit_set.unmanaged.masks[maskIndex(i)] = new_bits;
+}
+
 pub fn flip(self: *Self, i: usize) void {
     self.bit_set.toggle(i);
 }
@@ -114,6 +118,10 @@ fn numMasks(bit_length: usize) usize {
     return (bit_length + (@bitSizeOf(MaskInt) - 1)) / @bitSizeOf(MaskInt);
 }
 
+fn maskIndex(index: usize) usize {
+    return index >> @bitSizeOf(ShiftInt);
+}
+
 test "TestBitArray_GetSize" {
     var ctx = Context.init(testing.allocator);
     defer ctx.deinit();
@@ -184,4 +192,40 @@ test "TestBitArray_GetNextSet" {
     try testing.expectEqual(@as(usize, 10), a.getNextSet(10));
     try testing.expectEqual(@as(usize, 33), a.getNextSet(11));
     try testing.expectEqual(@as(usize, 65), a.getNextSet(34));
+}
+
+test "TestBitArray_GetNextUnset" {
+    var ctx = Context.init(testing.allocator);
+    defer ctx.deinit();
+
+    var a = try Self.init(&ctx, 65);
+    defer a.deinit();
+
+    a.bit_set.unmanaged.masks[0] = 0xffffffff;
+    a.bit_set.unmanaged.masks[1] = 0xffffffff;
+    a.bit_set.unmanaged.masks[2] = 0xffffffff;
+
+    a.flip(10);
+    a.flip(33);
+
+    try testing.expectEqual(@as(usize, 65), a.getNextUnSet(70));
+    try testing.expectEqual(@as(usize, 10), a.getNextUnSet(0));
+    try testing.expectEqual(@as(usize, 10), a.getNextUnSet(10));
+    // try testing.expectEqual(@as(usize, 33), a.getNextUnSet(11));
+    try testing.expectEqual(@as(usize, 65), a.getNextUnSet(134));
+    a.bit_set.unmanaged.masks[2] = 0x7ff;
+    try testing.expectEqual(@as(usize, 65), a.getNextUnSet(134));
+}
+
+test "TestBitArray_SetBulk" {
+    var ctx = Context.init(testing.allocator);
+    defer ctx.deinit();
+
+    var a = try Self.init(&ctx, 65);
+    defer a.deinit();
+
+    a.setBBulk(0, 0xff00ff00);
+    try testing.expectEqual(@as(usize, 0xff00ff00), a.bit_set.unmanaged.masks[0]);
+    a.setBBulk(32, 0x070707);
+    try testing.expectEqual(@as(usize, 0x070707), a.bit_set.unmanaged.masks[0]);
 }
