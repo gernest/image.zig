@@ -5,7 +5,8 @@ const testing = std.testing;
 
 const DynamicBitSet = std.bit_set.DynamicBitSet;
 const DynamicBitSetUnmanaged = std.bit_set.DynamicBitSetUnmanaged;
-const MaxInt = DynamicBitSetUnmanaged.MaskInt;
+const MaskInt = DynamicBitSetUnmanaged.MaskInt;
+const ShiftInt = DynamicBitSetUnmanaged.ShiftInt;
 
 bit_set: DynamicBitSet,
 ctx: *Context,
@@ -44,19 +45,27 @@ pub fn flip(self: *Self, i: usize) void {
 }
 
 pub fn getNextSet(self: *Self, from: usize) usize {
+    const size = self.getSize();
+    if (from > size) return size;
     var it = self.bit_set.iterator(.{});
-    if (it.next()) |idx| {
-        return idx;
+    while (it.next()) |idx| {
+        if (idx >= from) {
+            return idx;
+        }
     }
-    return 0;
+    return size;
 }
 
 pub fn getNextUnSet(self: *Self, from: usize) usize {
+    const size = self.getSize();
+    if (from > size) return size;
     var it = self.bit_set.iterator(.{ .kind = .unset });
-    if (it.next()) |idx| {
-        return idx;
+    while (it.next()) |idx| {
+        if (idx >= from) {
+            return idx;
+        }
     }
-    return 0;
+    return size;
 }
 
 pub fn clear(self: *Self) void {}
@@ -64,7 +73,7 @@ pub fn clear(self: *Self) void {}
 pub fn setBullk(self: *Self, index: usize, new_bits: usize) void {}
 
 pub fn ensureCapacity(self: *Self, size: usize) !void {
-    if (size > numMasks(self.getSize()) * @bitSizeOf(MaxInt)) {
+    if (size > numMasks(self.getSize()) * @bitSizeOf(MaskInt)) {
         try self.bit_set.resize(self.getSize() + size, false);
     }
 }
@@ -90,7 +99,7 @@ pub fn appendBiArray(self: *Self, other: *Self) !void {
 }
 
 pub fn xor(self: *Self, other: *Self) !void {
-    const num_masks = numMasks(self.bit_set.unmanaged.bit_length);
+    const num_masks = numMasks(self.getSize());
     for (self.unmanaged.masks[0..num_masks]) |*mask, i| {
         mask.* ^= other.masks[i];
     }
@@ -102,7 +111,7 @@ pub fn getBits(self: *Self, other: *Self) ![]usize {
 }
 
 fn numMasks(bit_length: usize) usize {
-    return (bit_length + (@bitSizeOf(MaxInt) - 1)) / @bitSizeOf(MaxInt);
+    return (bit_length + (@bitSizeOf(MaskInt) - 1)) / @bitSizeOf(MaskInt);
 }
 
 test "TestBitArray_GetSize" {
@@ -158,4 +167,21 @@ test "TestBitArray_GetSetFlip" {
 
     a.flip(3);
     try testing.expectEqual(true, a.get(3));
+}
+
+test "TestBitArray_GetNextSet" {
+    var ctx = Context.init(testing.allocator);
+    defer ctx.deinit();
+
+    var a = try Self.init(&ctx, 65);
+    defer a.deinit();
+
+    a.set(10);
+    a.set(33);
+
+    try testing.expectEqual(@as(usize, 65), a.getNextSet(70));
+    try testing.expectEqual(@as(usize, 10), a.getNextSet(3));
+    try testing.expectEqual(@as(usize, 10), a.getNextSet(10));
+    try testing.expectEqual(@as(usize, 33), a.getNextSet(11));
+    try testing.expectEqual(@as(usize, 65), a.getNextSet(34));
 }
